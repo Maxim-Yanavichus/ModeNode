@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ModeNode - Редактор ментальних карт</title>
+<style>
+:root{--bg-primary:#f8fafc;--bg-secondary:#ffffff;--bg-toolbar:#e2e8f0;--text-primary:#1e293b;--text-secondary:#475569;--border-color:#cbd5e1;--node-bg:#ffffff;--node-border:#3b82f6;--canvas-bg:#f1f5f9;--canvas-grid:#e2e8f0;--connection-line:#64748b;}
+[data-theme="dark"]{--bg-primary:#0f172a;--bg-secondary:#1e293b;--bg-toolbar:#334155;--text-primary:#f1f5f9;--text-secondary:#94a3b8;--border-color:#475569;--node-bg:#1e293b;--node-border:#3b82f6;--canvas-bg:#0f172a;--canvas-grid:#1e293b;--connection-line:#94a3b8;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:var(--bg-primary);color:var(--text-primary);overflow:hidden;height:100vh;}
+.app-container{display:flex;flex-direction:column;height:100vh;}
+.toolbar{background-color:var(--bg-toolbar);border-bottom:1px solid var(--border-color);padding:6px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:8px;}
+.toolbar-left,.toolbar-right{display:flex;align-items:center;gap:6px;}
+.toolbar-group{display:flex;align-items:center;gap:4px;padding:0 8px;border-right:1px solid var(--border-color);}
+.toolbar-group:last-child{border-right:none;}
+.toolbar-btn{background-color:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);padding:6px 10px;cursor:pointer;transition:all 0.15s;font-size:12px;font-weight:500;border-radius:4px;white-space:nowrap;}
+.toolbar-btn:hover{background-color:var(--node-border);color:white;border-color:var(--node-border);}
+.toolbar-btn.active{background-color:var(--node-border);color:white;border-color:var(--node-border);}
+.toolbar-btn.help-btn{width:28px;height:28px;padding:0;font-size:14px;font-weight:bold;border-radius:50%;}
+.app-title-block{margin-right:12px;padding-right:12px;border-right:1px solid var(--border-color);}
+.app-title{font-size:18px;font-weight:bold;color:var(--node-border);}
+.app-author{font-size:9px;color:var(--text-secondary);}
+.main-area{display:flex;flex:1;overflow:hidden;}
+.canvas-wrapper{flex:1;position:relative;overflow:hidden;background-color:var(--canvas-bg);}
+.canvas-container{position:absolute;width:10000px;height:10000px;background-color:var(--canvas-bg);background-image:linear-gradient(var(--canvas-grid) 1px,transparent 1px),linear-gradient(90deg,var(--canvas-grid) 1px,transparent 1px);background-size:20px 20px;transform-origin:0 0;}
+.node{position:absolute;background-color:var(--node-bg);cursor:move;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:box-shadow 0.2s;z-index:10;display:flex;align-items:center;justify-content:center;flex-direction:column;border-style:solid;min-width:60px;padding:8px 12px;}
+.node:hover{box-shadow:0 4px 16px rgba(0,0,0,0.15);}
+.node.selected{box-shadow:0 0 0 3px rgba(59,130,246,0.4);}
+.node.shape-rectangle{border-radius:4px;}
+.node.shape-rounded{border-radius:20px;}
+.node.shape-ellipse{border-radius:50%;}
+.node.shape-cloud{border-radius:50% 50% 50% 50%/60% 60% 40% 40%;}
+.node.shape-hexagon{clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);}
+.node.shape-diamond{clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);}
+.node.shape-parallelogram{transform:skewX(-10deg);border-radius:4px;}
+.node.shape-parallelogram .node-content{transform:skewX(10deg);}
+.node.shape-underline{background:transparent !important;border:none !important;border-bottom:3px solid !important;border-radius:0;box-shadow:none;padding:4px 8px;}
+.node.shape-bubble{border-radius:18px;position:relative;}
+.node.shape-bubble::after{content:'';position:absolute;bottom:-10px;left:20px;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid;}
+.node.collapsed .node-children-indicator{display:block;}
+.node-children-indicator{display:none;position:absolute;right:-8px;top:50%;transform:translateY(-50%);width:16px;height:16px;background:var(--node-border);color:white;border-radius:50%;font-size:10px;line-height:16px;text-align:center;cursor:pointer;}
+.node-content{text-align:center;display:flex;flex-direction:column;align-items:center;width:100%;justify-content:center;}
+.node-text{text-align:center;word-wrap:break-word;outline:none;min-height:18px;line-height:1.4;white-space:pre-wrap;max-width:250px;}
+.node-text:focus{background-color:rgba(255,255,255,0.3);border-radius:3px;}
+.node-image{max-width:120px;max-height:80px;margin-bottom:5px;border-radius:4px;object-fit:contain;}
+.node-audio{margin-top:5px;}
+.node-audio audio{width:120px;height:28px;}
+.resize-handle{position:absolute;width:12px;height:12px;background:var(--node-border);border:2px solid white;border-radius:2px;cursor:nwse-resize;right:-6px;bottom:-6px;opacity:0;transition:opacity 0.2s;z-index:25;}
+.node:hover .resize-handle,.node.selected .resize-handle{opacity:1;}
+.connection-point{position:absolute;width:12px;height:12px;background-color:var(--node-border);border:2px solid var(--bg-secondary);border-radius:50%;cursor:crosshair;opacity:0;transition:opacity 0.2s;z-index:20;}
+.node:hover .connection-point,.node.selected .connection-point{opacity:1;}
+.connection-point.right{right:-6px;top:50%;transform:translateY(-50%);}
+.connection-point.left{left:-6px;top:50%;transform:translateY(-50%);}
+.connection-point.top{top:-6px;left:50%;transform:translateX(-50%);}
+.connection-point.bottom{bottom:-6px;left:50%;transform:translateX(-50%);}
+.connections-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;}
+.drawing-layer{position:absolute;top:0;left:0;pointer-events:none;z-index:4;}
+.preview-layer{position:absolute;top:0;left:0;pointer-events:none;z-index:6;}
+.temp-line{stroke:var(--node-border);stroke-width:2;stroke-dasharray:5,5;fill:none;}
+.sidebar{width:260px;background-color:var(--bg-secondary);border-left:1px solid var(--border-color);overflow-y:auto;flex-shrink:0;}
+.sidebar-section{border-bottom:1px solid var(--border-color);padding:10px;}
+.sidebar-title{font-weight:600;margin-bottom:6px;color:var(--text-primary);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;}
+.color-row{display:flex;gap:6px;align-items:center;margin-bottom:5px;}
+.color-row label{font-size:11px;color:var(--text-secondary);width:55px;}
+.color-input{width:28px;height:22px;border:1px solid var(--border-color);border-radius:3px;cursor:pointer;padding:0;}
+.input-field,.select-field{width:100%;padding:5px 7px;border:1px solid var(--border-color);border-radius:4px;background-color:var(--bg-primary);color:var(--text-primary);font-size:11px;}
+.input-field:focus,.select-field:focus{outline:none;border-color:var(--node-border);}
+.btn-row{display:flex;gap:4px;margin-top:5px;}
+.btn-small{flex:1;padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-primary);color:var(--text-primary);cursor:pointer;font-size:10px;}
+.btn-small:hover{background:var(--bg-toolbar);}
+.btn-small.active{background:var(--node-border);color:white;border-color:var(--node-border);}
+.tree-item{padding:3px 6px;cursor:pointer;border-radius:3px;font-size:10px;margin-bottom:2px;display:flex;align-items:center;gap:4px;}
+.tree-item:hover{background:var(--bg-toolbar);}
+.tree-item.selected{background:var(--bg-toolbar);}
+.tree-expand{width:12px;font-size:9px;}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background-color:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;}
+.modal{background-color:var(--bg-secondary);border-radius:8px;padding:16px;min-width:320px;max-width:400px;box-shadow:0 20px 40px rgba(0,0,0,0.2);max-height:80vh;overflow-y:auto;}
+.modal-title{font-size:15px;font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary);line-height:1;}
+.modal-close:hover{color:var(--text-primary);}
+.hidden{display:none !important;}
+.context-menu{position:fixed;background-color:var(--bg-secondary);border:1px solid var(--border-color);border-radius:5px;box-shadow:0 4px 16px rgba(0,0,0,0.15);z-index:1000;min-width:140px;padding:3px 0;}
+.context-menu-item{padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text-primary);font-size:11px;}
+.context-menu-item:hover{background-color:var(--bg-toolbar);}
+.context-menu-divider{height:1px;background-color:var(--border-color);margin:3px 0;}
+.bottom-bar{background-color:var(--bg-toolbar);border-top:1px solid var(--border-color);display:flex;flex-shrink:0;}
+.tabs-area{display:flex;flex:1;overflow-x:auto;align-items:center;}
+.tab-add{width:28px;height:28px;margin:4px;display:flex;align-items:center;justify-content:center;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;cursor:pointer;font-size:18px;color:var(--text-primary);font-weight:300;}
+.tab-add:hover{background:var(--node-border);color:white;border-color:var(--node-border);}
+.tab-item{padding:6px 12px;cursor:pointer;font-size:11px;border-right:1px solid var(--border-color);background:var(--bg-secondary);white-space:nowrap;display:flex;align-items:center;gap:5px;height:100%;}
+.tab-item.active{background:var(--node-border);color:white;}
+.tab-item:hover:not(.active){background:var(--bg-toolbar);}
+.tab-close{font-size:13px;opacity:0.7;}
+.tab-close:hover{opacity:1;}
+.status-area{padding:6px 12px;font-size:10px;color:var(--text-secondary);display:flex;gap:12px;align-items:center;border-left:1px solid var(--border-color);}
+.zoom-controls{display:flex;align-items:center;gap:3px;}
+.zoom-btn{width:20px;height:20px;display:flex;align-items:center;justify-content:center;background-color:var(--bg-secondary);border:1px solid var(--border-color);border-radius:3px;cursor:pointer;font-weight:bold;color:var(--text-primary);font-size:11px;}
+.zoom-btn:hover{background-color:var(--bg-primary);}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;}
+.switch{position:relative;width:36px;height:18px;background-color:var(--border-color);border-radius:9px;cursor:pointer;transition:background-color 0.3s;}
+.switch.active{background-color:var(--node-border);}
+.switch::after{content:'';position:absolute;width:14px;height:14px;background-color:white;border-radius:50%;top:2px;left:2px;transition:left 0.3s;}
+.switch.active::after{left:20px;}
+.help-list{font-size:11px;color:var(--text-secondary);list-style:none;}
+.help-list li{padding:3px 0;border-bottom:1px solid var(--border-color);}
+.help-list li:last-child{border-bottom:none;}
+.form-group{margin-bottom:6px;}
+.form-group label{display:block;font-size:10px;margin-bottom:2px;color:var(--text-secondary);}
+.range-row{display:flex;align-items:center;gap:6px;}
+.range-row input[type="range"]{flex:1;height:4px;}
+.range-row span{min-width:24px;text-align:right;font-size:10px;}
+.drawing-tools{display:flex;gap:3px;flex-wrap:wrap;margin-top:5px;}
+.draw-tool-btn{width:28px;height:28px;border:1px solid var(--border-color);border-radius:3px;background:var(--bg-primary);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.draw-tool-btn:hover{background:var(--bg-toolbar);}
+.draw-tool-btn.active{background:var(--node-border);color:white;border-color:var(--node-border);}
+</style>
+</head>
+<body>
+<div class="app-container">
+<header class="toolbar">
+<div class="toolbar-left">
+<div class="app-title-block"><div class="app-title">ModeNode</div><div class="app-author">By Максим Янавічюс</div></div>
+<div class="toolbar-group">
+<button class="toolbar-btn" onclick="addNode()">Вузол</button>
+<button class="toolbar-btn" onclick="addChildNode()">Дочiрнiй</button>
+</div>
+<div class="toolbar-group">
+<button class="toolbar-btn" onclick="addImageNode()">Картинка</button>
+<button class="toolbar-btn" onclick="addAudioNode()">Аудiо</button>
+</div>
+<div class="toolbar-group">
+<button class="toolbar-btn" onclick="deleteSelected()">Видалити</button>
+<button class="toolbar-btn" onclick="disconnectNode()">Вiд'єднати</button>
+</div>
+<div class="toolbar-group">
+<button class="toolbar-btn" id="brushModeBtn" onclick="toggleBrushMode()">Пензлик</button>
+</div>
+<div class="toolbar-group">
+<button class="toolbar-btn" onclick="exportToPNG()">PNG</button>
+</div>
+<div class="toolbar-group" style="border-right:none;">
+<button class="toolbar-btn" onclick="shareMap()">Подiлитися</button>
+</div>
+</div>
+<div class="toolbar-right">
+<button class="toolbar-btn" onclick="openSettings()">Налаштування</button>
+<button class="toolbar-btn help-btn" onclick="openHelp()" title="Довiдка">?</button>
+</div>
+</header>
+<div class="main-area">
+<div class="canvas-wrapper" id="canvasWrapper">
+<div class="canvas-container" id="canvas">
+<canvas class="drawing-layer" id="drawingLayer" width="10000" height="10000"></canvas>
+<canvas class="preview-layer" id="previewLayer" width="10000" height="10000"></canvas>
+<svg class="connections-layer" id="connectionsLayer"><path class="temp-line hidden" id="tempLine"></path></svg>
+<div id="nodesContainer"></div>
+</div>
+</div>
+<div class="sidebar">
+<div class="sidebar-section">
+<div class="sidebar-title">Властивостi вузла</div>
+<div id="nodeProperties"><p style="color:var(--text-secondary);font-size:11px;">Оберiть вузол</p></div>
+</div>
+<div class="sidebar-section">
+<div class="sidebar-title">Кольори</div>
+<div class="color-row"><label>Контур:</label><input type="color" class="color-input" id="borderColor" value="#3b82f6" oninput="setNodeBorderColor(this.value)"></div>
+<div class="color-row"><label>Заливка:</label><input type="color" class="color-input" id="fillColor" value="#ffffff" oninput="setNodeFillColor(this.value)"></div>
+<div class="color-row"><label>Текст:</label><input type="color" class="color-input" id="textColor" value="#1e293b" oninput="setNodeTextColor(this.value)"></div>
+<div class="form-group"><label>Товщина контуру</label><div class="range-row"><input type="range" id="borderWidth" min="1" max="8" value="2" oninput="setNodeBorderWidth(this.value)"><span id="borderWidthVal">2</span></div></div>
+</div>
+<div class="sidebar-section">
+<div class="sidebar-title">Форма</div>
+<select class="select-field" id="shapeSelect" onchange="setNodeShape(this.value)">
+<option value="rectangle">Прямокутник</option>
+<option value="rounded">Закруглений</option>
+<option value="ellipse">Елiпс</option>
+<option value="cloud">Хмарка</option>
+<option value="bubble">Бульбашка</option>
+<option value="hexagon">Шестикутник</option>
+<option value="diamond">Ромб</option>
+<option value="parallelogram">Паралелограм</option>
+<option value="underline">Пiдкреслення</option>
+</select>
+<div class="form-group hidden" id="imageModeGroup" style="margin-top:10px;border-top:1px solid var(--border-color);padding-top:10px;">
+<div class="range-row" style="justify-content:space-between;">
+<label style="width:auto;color:var(--text-primary);">Тільки картинка</label>
+<div class="switch" id="imageOnlySwitch" onclick="toggleImageOnly()"></div>
+</div>
+</div>
+</div>
+<div class="sidebar-section">
+<div class="sidebar-title">Шрифт</div>
+<select class="select-field" id="fontSelect" onchange="setNodeFont(this.value)">
+<option value="Segoe UI">Segoe UI</option>
+<option value="Arial">Arial</option>
+<option value="Times New Roman">Times New Roman</option>
+<option value="Georgia">Georgia</option>
+<option value="Verdana">Verdana</option>
+<option value="Courier New">Courier New</option>
+<option value="Trebuchet MS">Trebuchet MS</option>
+<option value="Impact">Impact</option>
+<option value="Comic Sans MS">Comic Sans MS</option>
+<option value="Palatino">Palatino</option>
+</select>
+<div class="form-group" style="margin-top:5px;"><label>Розмiр тексту</label><div class="range-row"><input type="range" id="fontSize" min="8" max="36" value="14" oninput="setNodeFontSize(this.value)"><span id="fontSizeVal">14</span></div></div>
+<div class="btn-row"><button class="btn-small" id="boldBtn" onclick="toggleBold()">Жирний</button><button class="btn-small" id="italicBtn" onclick="toggleItalic()">Курсив</button></div>
+</div>
+<div class="sidebar-section" id="brushSection">
+<div class="sidebar-title">Пензлик</div>
+<div class="color-row"><label>Колiр:</label><input type="color" class="color-input" id="brushColor" value="#3b82f6"></div>
+<div class="form-group"><label>Розмiр</label><div class="range-row"><input type="range" id="brushSize" min="1" max="30" value="3"><span id="brushSizeVal">3</span></div></div>
+<div class="drawing-tools">
+<button class="draw-tool-btn active" data-tool="line" onclick="setDrawTool('line')" title="Лiнiя">/</button>
+<button class="draw-tool-btn" data-tool="arrow" onclick="setDrawTool('arrow')" title="Стрiлка">→</button>
+<button class="draw-tool-btn" data-tool="rect" onclick="setDrawTool('rect')" title="Квадрат">▢</button>
+<button class="draw-tool-btn" data-tool="circle" onclick="setDrawTool('circle')" title="Коло">○</button>
+<button class="draw-tool-btn" data-tool="eraser" onclick="setDrawTool('eraser')" title="Гумка">⌫</button>
+</div>
+<div class="btn-row" style="margin-top:6px;"><button class="btn-small" onclick="clearDrawing()">Очистити</button></div>
+</div>
+<div class="sidebar-section">
+<div class="sidebar-title">Структура</div>
+<div id="treeView" style="max-height:150px;overflow-y:auto;"></div>
+</div>
+</div>
+</div>
+<div class="bottom-bar">
+<div class="tabs-area" id="tabsArea">
+<button class="tab-add" onclick="createNewMap()" title="Нова карта">+</button>
+</div>
+<div class="status-area">
+<div class="zoom-controls"><button class="zoom-btn" onclick="zoomOut()">-</button><span id="zoomLevel" style="min-width:36px;text-align:center;">100%</span><button class="zoom-btn" onclick="zoomIn()">+</button></div>
+<span id="nodeCount">Вузлiв: 0</span>
+</div>
+</div>
+</div>
+<div class="context-menu hidden" id="contextMenu">
+<div class="context-menu-item" onclick="addNode()">Додати вузол</div>
+<div class="context-menu-item" onclick="addChildNode()">Дочiрнiй вузол</div>
+<div class="context-menu-item" onclick="addImageNode()">Додати картинку</div>
+<div class="context-menu-item" onclick="addAudioNode()">Додати аудiо</div>
+<div class="context-menu-divider"></div>
+<div class="context-menu-item" onclick="toggleCollapse()">Згорнути/Розгорнути</div>
+<div class="context-menu-item" onclick="duplicateNode()">Дублювати</div>
+<div class="context-menu-item" onclick="disconnectNode()">Вiд'єднати</div>
+<div class="context-menu-item" onclick="deleteSelected()">Видалити</div>
+<div class="context-menu-divider"></div>
+<div class="context-menu-item" onclick="centerView()">Центрувати</div>
+</div>
+<div class="modal-overlay hidden" id="settingsModal">
+<div class="modal">
+<div class="modal-title">Налаштування<button class="modal-close" onclick="closeSettings()">&times;</button></div>
+<div class="settings-row"><span>Темна тема</span><div class="switch" id="themeSwitch" onclick="toggleTheme()"></div></div>
+<div class="settings-row"><span>Сiтка</span><div class="switch active" id="gridSwitch" onclick="toggleGrid()"></div></div>
+<div class="form-group" style="margin-top:8px;"><label>Назва карти</label><input type="text" class="input-field" id="mapName" value="Нова карта" onchange="updateMapName()"></div>
+<div class="form-group" style="margin-top:10px;border-top:1px solid var(--border-color);padding-top:10px;"><label>Iмпорт карти</label><input type="file" id="importInput" accept=".json" style="display:none" onchange="importMap(event)"><button class="btn-small" onclick="document.getElementById('importInput').click()" style="width:100%;margin-top:4px;">Вiдкрити JSON файл</button></div>
+</div>
+</div>
+<div class="modal-overlay hidden" id="helpModal">
+<div class="modal">
+<div class="modal-title">Iнструкцiя<button class="modal-close" onclick="closeHelp()">&times;</button></div>
+<ul class="help-list">
+<li><b>Подвiйний клiк на полотнi</b> - зняти видiлення</li>
+<li><b>Перетягування вузла</b> - перемiстити</li>
+<li><b>Кутовий маркер</b> - змiнити розмiр вузла</li>
+<li><b>Space + ЛКМ / Середня кнопка</b> - рухати полотно</li>
+<li><b>Колесо мишi</b> - масштабування</li>
+<li><b>Точки з'єднання</b> - перетягнiть для зв'язку</li>
+<li><b>Delete</b> - видалити вузол</li>
+<li><b>Права кнопка</b> - контекстне меню</li>
+<li><b>Згорнути</b> - приховати дочiрнi вузли</li>
+<li><b>+ внизу</b> - створити нову карту</li>
+<li><b>Пензлик</b> - режим малювання</li>
+</ul>
+</div>
+</div>
+<input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+<input type="file" id="audioInput" accept="audio/*" style="display:none" onchange="handleAudioUpload(event)">
+<script>
+let maps=[],currentMapIndex=0,nodes=[],connections=[],selectedNode=null,draggingNode=null,resizingNode=null,dragOffset={x:0,y:0},connectingFrom=null,connectingPoint=null,zoom=1,pan={x:0,y:0},isPanning=false,panStart={x:0,y:0},panOffset={x:0,y:0},nodeIdCounter=0,mapIdCounter=0,isDarkTheme=false,showGrid=true,spacePressed=false,brushMode=false,drawTool='line',isDrawing=false,drawStart={x:0,y:0},drawingCtx=null,previewCtx=null,drawings=[],currentStroke=null;
+document.addEventListener('DOMContentLoaded',()=>{
+drawingCtx=document.getElementById('drawingLayer').getContext('2d');
+previewCtx=document.getElementById('previewLayer').getContext('2d');
+drawingCtx.lineCap='round';
+drawingCtx.lineJoin='round';
+createNewMap();
+document.addEventListener('keydown',handleKeyDown);
+document.addEventListener('keyup',handleKeyUp);
+document.addEventListener('click',hideContextMenu);
+const wrapper=document.getElementById('canvasWrapper');
+wrapper.addEventListener('mousedown',wrapperMouseDown);
+wrapper.addEventListener('mousemove',wrapperMouseMove);
+wrapper.addEventListener('mouseup',wrapperMouseUp);
+wrapper.addEventListener('mouseleave',wrapperMouseUp);
+wrapper.addEventListener('wheel',handleWheel,{passive:false});
+wrapper.addEventListener('contextmenu',showContextMenu);
+wrapper.addEventListener('dblclick',handleDoubleClick);
+document.getElementById('brushSize').addEventListener('input',e=>{document.getElementById('brushSizeVal').textContent=e.target.value;});
+});
+function handleDoubleClick(e){if(!e.target.closest('.node')&&!brushMode){selectedNode=null;renderAll();updateNodeProperties();}}
+function updateCanvasTransform(){document.getElementById('canvas').style.transform=`translate(${pan.x}px,${pan.y}px) scale(${zoom})`;}
+function createNewMap(){
+saveCurrentMap();
+const mapId=++mapIdCounter;
+const mapData={id:mapId,name:'Карта '+mapId,nodes:[],connections:[],nodeIdCounter:0,drawings:[]};
+const rootNode={id:1,x:5000,y:5000,text:'Головна iдея',isRoot:true,borderColor:'#3b82f6',fillColor:'#ffffff',textColor:'#1e293b',borderWidth:2,shape:'rounded',font:'Segoe UI',fontSize:14,bold:true,italic:false,collapsed:false,image:null,audio:null,customWidth:null,customHeight:null,imageOnly:false};
+mapData.nodes.push(rootNode);
+mapData.nodeIdCounter=1;
+maps.push(mapData);
+currentMapIndex=maps.length-1;
+loadCurrentMap();
+centerOnNode(rootNode);
+renderTabs();
+}
+function saveCurrentMap(){if(maps.length>0&&maps[currentMapIndex]){maps[currentMapIndex].nodes=JSON.parse(JSON.stringify(nodes));maps[currentMapIndex].connections=JSON.parse(JSON.stringify(connections));maps[currentMapIndex].nodeIdCounter=nodeIdCounter;maps[currentMapIndex].drawings=JSON.parse(JSON.stringify(drawings));}}
+function loadCurrentMap(){const map=maps[currentMapIndex];nodes=JSON.parse(JSON.stringify(map.nodes));connections=JSON.parse(JSON.stringify(map.connections));nodeIdCounter=map.nodeIdCounter;drawings=map.drawings?JSON.parse(JSON.stringify(map.drawings)):[];document.getElementById('mapName').value=map.name;renderAll();redrawAllStrokes();updateNodeProperties();}
+function switchToMap(index){if(index===currentMapIndex)return;saveCurrentMap();currentMapIndex=index;loadCurrentMap();renderTabs();}
+function closeMap(index,e){e.stopPropagation();if(maps.length===1)return;maps.splice(index,1);if(currentMapIndex>=maps.length)currentMapIndex=maps.length-1;else if(index<currentMapIndex)currentMapIndex--;loadCurrentMap();renderTabs();}
+function renderTabs(){const tabsArea=document.getElementById('tabsArea');tabsArea.innerHTML='<button class="tab-add" onclick="createNewMap()" title="Нова карта">+</button>'+maps.map((m,i)=>`<div class="tab-item${i===currentMapIndex?' active':''}" onclick="switchToMap(${i})">${m.name}<span class="tab-close" onclick="closeMap(${i},event)">×</span></div>`).join('');}
+function centerOnNode(node){const wrapper=document.getElementById('canvasWrapper');pan.x=wrapper.offsetWidth/2-node.x*zoom-60;pan.y=wrapper.offsetHeight/2-node.y*zoom-25;updateCanvasTransform();}
+function createNodeObject(x,y,text='Новий вузол',isRoot=false){return{id:++nodeIdCounter,x,y,text,isRoot,borderColor:'#3b82f6',fillColor:'#ffffff',textColor:isDarkTheme?'#f1f5f9':'#1e293b',borderWidth:2,shape:'rectangle',font:'Segoe UI',fontSize:14,bold:false,italic:false,collapsed:false,image:null,audio:null,customWidth:null,customHeight:null,imageOnly:false};}
+function renderAll(){renderNodes();renderConnections();renderTreeView();updateNodeCount();}
+function getVisibleNodes(){const hiddenIds=new Set();nodes.forEach(n=>{if(n.collapsed){getDescendants(n.id).forEach(id=>hiddenIds.add(id));}});return nodes.filter(n=>!hiddenIds.has(n.id));}
+function getDescendants(nodeId){const result=[];connections.filter(c=>c.from===nodeId).forEach(c=>{result.push(c.to);result.push(...getDescendants(c.to));});return result;}
+function hasChildren(nodeId){return connections.some(c=>c.from===nodeId);}
+function renderNodes(){
+const container=document.getElementById('nodesContainer');
+container.innerHTML='';
+const visible=getVisibleNodes();
+visible.forEach(node=>{
+const el=document.createElement('div');
+el.className=`node shape-${node.shape}${selectedNode?.id===node.id?' selected':''}${node.collapsed?' collapsed':''}`;
+el.id=`node-${node.id}`;
+el.style.left=node.x+'px';
+el.style.top=node.y+'px';
+el.style.borderColor=node.borderColor;
+el.style.borderWidth=(node.borderWidth||2)+'px';
+el.style.backgroundColor=node.fillColor;
+const isImgOnly=node.image&&node.imageOnly;
+if(isImgOnly){
+el.style.padding='0';
+if(!node.customWidth)el.style.width='150px';
+if(!node.customHeight)el.style.height='150px';
+}
+if(node.customWidth)el.style.width=node.customWidth+'px';
+if(node.customHeight)el.style.height=node.customHeight+'px';
+if(node.shape==='bubble')el.style.setProperty('--bubble-color',node.borderColor);
+if(node.shape==='underline'){el.style.borderBottomColor=node.borderColor;el.style.borderBottomWidth=(node.borderWidth||2)+'px';}
+const fontSize = node.fontSize || 14;
+const textStyle=`font-family:'${node.font}',sans-serif;font-size:${fontSize}px;font-weight:${node.bold?'bold':'normal'};font-style:${node.italic?'italic':'normal'};color:${node.textColor};${node.customWidth?'max-width:'+(node.customWidth-24)+'px;':''}`;
+let content='';
+if(isImgOnly){
+content+=`<img src="${node.image}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;pointer-events:none;" alt="">`;
+}else{
+content+='<div class="node-content">';
+if(node.image)content+=`<img src="${node.image}" class="node-image" alt="">`;
+content+=`<div class="node-text" style="${textStyle}" contenteditable="false" ondblclick="startEditing(this)" onblur="stopEditing(this,${node.id})" onkeydown="handleTextKeyDown(event,${node.id})">${node.text}</div>`;
+if(node.audio)content+=`<div class="node-audio"><audio controls src="${node.audio}"></audio></div>`;
+content+='</div>';
+}
+if(hasChildren(node.id))content+=`<div class="node-children-indicator" onclick="toggleCollapseNode(${node.id},event)">${node.collapsed?'+':''}</div>`;
+content+=`<div class="connection-point top" data-point="top" data-node="${node.id}"></div><div class="connection-point right" data-point="right" data-node="${node.id}"></div><div class="connection-point bottom" data-point="bottom" data-node="${node.id}"></div><div class="connection-point left" data-point="left" data-node="${node.id}"></div>`;
+content+=`<div class="resize-handle" data-node="${node.id}"></div>`;
+el.innerHTML=content;
+el.addEventListener('mousedown',e=>startDragging(e,node));
+el.addEventListener('click',e=>selectNode(e,node));
+container.appendChild(el);
+node.width=el.offsetWidth;
+node.height=el.offsetHeight;
+el.querySelectorAll('.connection-point').forEach(p=>p.addEventListener('mousedown',e=>startConnection(e,node.id,p.dataset.point)));
+el.querySelector('.resize-handle').addEventListener('mousedown',e=>startResizing(e,node));
+});
+}
+function renderConnections(){
+const svg=document.getElementById('connectionsLayer');
+const tempLine=document.getElementById('tempLine');
+svg.innerHTML='';
+svg.appendChild(tempLine);
+const visible=getVisibleNodes();
+const visibleIds=new Set(visible.map(n=>n.id));
+connections.forEach(conn=>{
+if(!visibleIds.has(conn.from)||!visibleIds.has(conn.to))return;
+const fromNode=nodes.find(n=>n.id===conn.from);
+const toNode=nodes.find(n=>n.id===conn.to);
+if(!fromNode||!toNode)return;
+const fromPt=getConnectionPoint(fromNode,conn.fromPoint);
+const toPt=getConnectionPoint(toNode,conn.toPoint);
+const path=createCurvePath(fromPt,toPt,conn.fromPoint,conn.toPoint);
+const pathEl=document.createElementNS('http://www.w3.org/2000/svg','path');
+pathEl.setAttribute('d',path);
+pathEl.setAttribute('stroke','var(--connection-line)');
+pathEl.setAttribute('stroke-width','2');
+pathEl.setAttribute('fill','none');
+svg.appendChild(pathEl);
+});
+}
+function getConnectionPoint(node,point){
+const w=node.width||120;
+const h=node.height||40;
+switch(point){
+case 'top':return{x:node.x+w/2,y:node.y+(node.shape==='underline'?h-5:0)};
+case 'bottom':return{x:node.x+w/2,y:node.y+h};
+case 'left':return{x:node.x,y:node.y+h/2};
+case 'right':return{x:node.x+w,y:node.y+h/2};
+default:return{x:node.x+w/2,y:node.y+h/2};
+}
+}
+function createCurvePath(from,to,fromPoint,toPoint){
+const dist=Math.sqrt((to.x-from.x)**2+(to.y-from.y)**2);
+const curv=Math.min(dist*0.4,80);
+let c1={...from},c2={...to};
+if(fromPoint==='top')c1.y-=curv;else if(fromPoint==='bottom')c1.y+=curv;else if(fromPoint==='left')c1.x-=curv;else if(fromPoint==='right')c1.x+=curv;
+if(toPoint==='top')c2.y-=curv;else if(toPoint==='bottom')c2.y+=curv;else if(toPoint==='left')c2.x-=curv;else if(toPoint==='right')c2.x+=curv;
+return`M ${from.x} ${from.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${to.x} ${to.y}`;
+}
+function renderTreeView(){
+const tree=document.getElementById('treeView');
+if(!nodes.length){tree.innerHTML='<p style="color:var(--text-secondary);font-size:10px;">Порожньо</p>';return;}
+tree.innerHTML=nodes.map(n=>{
+const sel=selectedNode?.id===n.id?' selected':'';
+const exp=hasChildren(n.id)?(n.collapsed?'▸':'▾'):'·';
+return`<div class="tree-item${sel}" onclick="selectNodeById(${n.id})"><span class="tree-expand">${exp}</span>${n.text.substring(0,18)}${n.text.length>18?'...':''}</div>`;
+}).join('');
+}
+function selectNodeById(id){const node=nodes.find(n=>n.id===id);if(node){selectedNode=node;renderAll();updateNodeProperties();updateSidebarState();}}
+function selectNode(e,node){e.stopPropagation();selectedNode=node;renderAll();updateNodeProperties();updateSidebarState();}
+function updateSidebarState(){
+if(!selectedNode)return;
+document.getElementById('borderColor').value=selectedNode.borderColor;
+document.getElementById('fillColor').value=selectedNode.fillColor;
+document.getElementById('textColor').value=selectedNode.textColor;
+document.getElementById('borderWidth').value=selectedNode.borderWidth||2;
+document.getElementById('borderWidthVal').textContent=selectedNode.borderWidth||2;
+document.getElementById('shapeSelect').value=selectedNode.shape;
+document.getElementById('fontSelect').value=selectedNode.font;
+document.getElementById('fontSize').value = selectedNode.fontSize || 14;
+document.getElementById('fontSizeVal').textContent = selectedNode.fontSize || 14;
+document.getElementById('boldBtn').classList.toggle('active',selectedNode.bold);
+document.getElementById('italicBtn').classList.toggle('active',selectedNode.italic);
+const imgGroup=document.getElementById('imageModeGroup');
+if(selectedNode.image){
+imgGroup.classList.remove('hidden');
+document.getElementById('imageOnlySwitch').classList.toggle('active',selectedNode.imageOnly||false);
+}else{
+imgGroup.classList.add('hidden');
+}
+}
+function updateNodeProperties(){
+const container=document.getElementById('nodeProperties');
+if(!selectedNode){container.innerHTML='<p style="color:var(--text-secondary);font-size:11px;">Оберiть вузол</p>';return;}
+container.innerHTML=`<div class="form-group"><label>Текст</label><input type="text" class="input-field" value="${selectedNode.text.replace(/"/g,'&quot;').replace(/\n/g,' ')}" onchange="updateNodeText(this.value)"></div><div class="form-group"><label>X / Y</label><div style="display:flex;gap:3px;"><input type="number" class="input-field" id="nodeXInput" value="${Math.round(selectedNode.x)}" onchange="updateNodePos('x',this.value)" style="flex:1"><input type="number" class="input-field" id="nodeYInput" value="${Math.round(selectedNode.y)}" onchange="updateNodePos('y',this.value)" style="flex:1"></div></div><div class="btn-row"><button class="btn-small" onclick="toggleCollapse()">Згорнути</button><button class="btn-small" onclick="duplicateNode()">Копiя</button></div>`;
+}
+function updateNodeText(text){if(selectedNode){selectedNode.text=text;renderAll();}}
+function updateNodePos(axis,val){if(selectedNode){selectedNode[axis]=parseInt(val);renderAll();}}
+function setNodeBorderColor(c){if(selectedNode){selectedNode.borderColor=c;renderAll();}}
+function setNodeFillColor(c){if(selectedNode){selectedNode.fillColor=c;renderAll();}}
+function setNodeTextColor(c){if(selectedNode){selectedNode.textColor=c;renderAll();}}
+function setNodeBorderWidth(w){if(selectedNode){selectedNode.borderWidth=parseInt(w);document.getElementById('borderWidthVal').textContent=w;renderAll();}}
+function setNodeShape(s){if(selectedNode){selectedNode.shape=s;renderAll();}}
+function setNodeFont(f){if(selectedNode){selectedNode.font=f;renderAll();}}
+function setNodeFontSize(s){if(selectedNode){selectedNode.fontSize=parseInt(s);document.getElementById('fontSizeVal').textContent=s;renderAll();}}
+function toggleBold(){if(selectedNode){selectedNode.bold=!selectedNode.bold;renderAll();updateSidebarState();}}
+function toggleItalic(){if(selectedNode){selectedNode.italic=!selectedNode.italic;renderAll();updateSidebarState();}}
+function toggleImageOnly(){if(selectedNode&&selectedNode.image){selectedNode.imageOnly=!selectedNode.imageOnly;renderAll();updateSidebarState();}}
+function toggleCollapse(){hideContextMenu();if(selectedNode&&hasChildren(selectedNode.id)){selectedNode.collapsed=!selectedNode.collapsed;renderAll();}}
+function toggleCollapseNode(id,e){e.stopPropagation();const node=nodes.find(n=>n.id===id);if(node){node.collapsed=!node.collapsed;renderAll();}}
+function addNode(){
+hideContextMenu();
+const wrapper=document.getElementById('canvasWrapper');
+const cx=(-pan.x+wrapper.offsetWidth/2)/zoom;
+const cy=(-pan.y+wrapper.offsetHeight/2)/zoom;
+const newNode=createNodeObject(cx-60+Math.random()*40-20,cy-20+Math.random()*40-20);
+nodes.push(newNode);
+selectedNode=newNode;
+renderAll();
+updateNodeProperties();
+updateSidebarState();
+}
+function addChildNode(){
+hideContextMenu();
+let parentNode=selectedNode;
+if(!parentNode){parentNode=nodes.find(n=>n.isRoot);if(!parentNode)return;}
+if(parentNode.collapsed)parentNode.collapsed=false;
+const childCount=connections.filter(c=>c.from===parentNode.id).length;
+const newNode=createNodeObject(parentNode.x+(parentNode.width||120)+60,parentNode.y+childCount*50);
+nodes.push(newNode);
+connections.push({id:Date.now(),from:parentNode.id,to:newNode.id,fromPoint:'right',toPoint:'left'});
+selectedNode=newNode;
+renderAll();
+updateNodeProperties();
+updateSidebarState();
+}
+function addImageNode(){hideContextMenu();document.getElementById('imageInput').click();}
+function addAudioNode(){hideContextMenu();document.getElementById('audioInput').click();}
+function handleImageUpload(e){
+const file=e.target.files[0];
+if(!file)return;
+const reader=new FileReader();
+reader.onload=function(ev){
+const wrapper=document.getElementById('canvasWrapper');
+const cx=(-pan.x+wrapper.offsetWidth/2)/zoom;
+const cy=(-pan.y+wrapper.offsetHeight/2)/zoom;
+const newNode=createNodeObject(cx-60,cy-40,'Картинка');
+newNode.image=ev.target.result;
+nodes.push(newNode);
+selectedNode=newNode;
+renderAll();
+updateNodeProperties();
+updateSidebarState();
+};
+reader.readAsDataURL(file);
+e.target.value='';
+}
+function handleAudioUpload(e){
+const file=e.target.files[0];
+if(!file)return;
+const reader=new FileReader();
+reader.onload=function(ev){
+const wrapper=document.getElementById('canvasWrapper');
+const cx=(-pan.x+wrapper.offsetWidth/2)/zoom;
+const cy=(-pan.y+wrapper.offsetHeight/2)/zoom;
+const newNode=createNodeObject(cx-60,cy-40,'Аудiо');
+newNode.audio=ev.target.result;
+nodes.push(newNode);
+selectedNode=newNode;
+renderAll();
+updateNodeProperties();
+updateSidebarState();
+};
+reader.readAsDataURL(file);
+e.target.value='';
+}
+function duplicateNode(){hideContextMenu();if(!selectedNode)return;const newNode={...selectedNode,id:++nodeIdCounter,x:selectedNode.x+30,y:selectedNode.y+30,text:selectedNode.text+' (копiя)',isRoot:false};nodes.push(newNode);selectedNode=newNode;renderAll();updateNodeProperties();updateSidebarState();}
+function disconnectNode(){hideContextMenu();if(!selectedNode)return;connections=connections.filter(c=>c.to!==selectedNode.id);renderAll();}
+function deleteSelected(){hideContextMenu();if(!selectedNode)return;if(selectedNode.isRoot&&nodes.length>1)return;connections=connections.filter(c=>c.from!==selectedNode.id&&c.to!==selectedNode.id);nodes=nodes.filter(n=>n.id!==selectedNode.id);selectedNode=null;renderAll();updateNodeProperties();}
+function startResizing(e,node){e.stopPropagation();e.preventDefault();resizingNode=node;selectedNode=node;renderAll();updateNodeProperties();updateSidebarState();}
+function startDragging(e,node){
+if(e.target.classList.contains('connection-point')||e.target.classList.contains('node-children-indicator')||e.target.classList.contains('resize-handle'))return;
+if(spacePressed||e.button===1||brushMode)return;
+e.stopPropagation();
+draggingNode=node;
+selectedNode=node;
+const rect=document.getElementById('canvasWrapper').getBoundingClientRect();
+dragOffset={x:(e.clientX-rect.left-pan.x)/zoom-node.x,y:(e.clientY-rect.top-pan.y)/zoom-node.y};
+renderAll();
+updateNodeProperties();
+updateSidebarState();
+}
+function getMousePos(e){
+const rect=document.getElementById('canvasWrapper').getBoundingClientRect();
+return{x:(e.clientX-rect.left-pan.x)/zoom,y:(e.clientY-rect.top-pan.y)/zoom};
+}
+function wrapperMouseDown(e){
+const wrapper=document.getElementById('canvasWrapper');
+const isNode=e.target.closest('.node');
+const pos=getMousePos(e);
+if(brushMode&&e.button===0&&!isNode){
+isDrawing=true;
+drawStart={x:pos.x,y:pos.y};
+lastX=pos.x;
+lastY=pos.y;
+currentStroke={type:drawTool,points:[{x:pos.x,y:pos.y}],color:document.getElementById('brushColor').value,size:parseInt(document.getElementById('brushSize').value)};
+return;
+}
+if(e.button===1||(e.button===0&&spacePressed)){
+isPanning=true;
+panStart={x:e.clientX,y:e.clientY};
+panOffset={x:pan.x,y:pan.y};
+wrapper.style.cursor='grabbing';
+e.preventDefault();
+}
+}
+function wrapperMouseMove(e){
+const wrapper=document.getElementById('canvasWrapper');
+const pos=getMousePos(e);
+if(resizingNode){
+const newW=Math.max(60,pos.x-resizingNode.x);
+const newH=Math.max(30,pos.y-resizingNode.y);
+resizingNode.customWidth=newW;
+resizingNode.customHeight=newH;
+renderAll();
+}
+if(draggingNode){
+draggingNode.x=pos.x-dragOffset.x;
+draggingNode.y=pos.y-dragOffset.y;
+if(document.getElementById('nodeXInput')){
+document.getElementById('nodeXInput').value=Math.round(draggingNode.x);
+document.getElementById('nodeYInput').value=Math.round(draggingNode.y);
+}
+renderAll();
+}
+if(isPanning){pan.x=panOffset.x+(e.clientX-panStart.x);pan.y=panOffset.y+(e.clientY-panStart.y);updateCanvasTransform();}
+if(connectingFrom!==null){
+const fromNode=nodes.find(n=>n.id===connectingFrom);
+if(fromNode){
+const fromPt=getConnectionPoint(fromNode,connectingPoint);
+const tempLine=document.getElementById('tempLine');
+tempLine.classList.remove('hidden');
+tempLine.setAttribute('d',`M ${fromPt.x} ${fromPt.y} L ${pos.x} ${pos.y}`);
+}
+}
+if(isDrawing&&brushMode&&currentStroke){
+const color=currentStroke.color;
+const size=currentStroke.size;
+if(drawTool==='eraser'){
+drawingCtx.globalCompositeOperation='destination-out';
+drawingCtx.beginPath();
+drawingCtx.arc(pos.x,pos.y,size*2,0,Math.PI*2);
+drawingCtx.fill();
+drawingCtx.globalCompositeOperation='source-over';
+}else{
+drawPreview(pos.x,pos.y,color,size);
+}
+}
+}
+function wrapperMouseUp(e){
+const wrapper=document.getElementById('canvasWrapper');
+const pos=getMousePos(e);
+if(resizingNode){resizingNode=null;}
+draggingNode=null;
+if(connectingFrom!==null){
+const target=document.elementFromPoint(e.clientX,e.clientY);
+if(target&&target.classList.contains('connection-point')){
+const toNodeId=parseInt(target.dataset.node);
+const toPoint=target.dataset.point;
+if(toNodeId!==connectingFrom){
+const exists=connections.some(c=>(c.from===connectingFrom&&c.to===toNodeId)||(c.from===toNodeId&&c.to===connectingFrom));
+if(!exists){connections.push({id:Date.now(),from:connectingFrom,to:toNodeId,fromPoint:connectingPoint,toPoint});renderConnections();updateNodeCount();}
+}
+}
+connectingFrom=null;
+connectingPoint=null;
+document.getElementById('tempLine').classList.add('hidden');
+}
+if(isPanning){isPanning=false;wrapper.style.cursor='';}
+if(isDrawing&&brushMode&&currentStroke){
+const color=currentStroke.color;
+const size=currentStroke.size;
+if(drawTool==='line'){
+drawingCtx.strokeStyle=color;
+drawingCtx.lineWidth=size;
+drawingCtx.beginPath();
+drawingCtx.moveTo(drawStart.x,drawStart.y);
+drawingCtx.lineTo(pos.x,pos.y);
+drawingCtx.stroke();
+drawings.push({type:'line',x1:drawStart.x,y1:drawStart.y,x2:pos.x,y2:pos.y,color,size});
+}else if(drawTool==='arrow'){
+drawingCtx.strokeStyle=color;
+drawingCtx.fillStyle=color;
+drawingCtx.lineWidth=size;
+drawingCtx.beginPath();
+drawingCtx.moveTo(drawStart.x,drawStart.y);
+drawingCtx.lineTo(pos.x,pos.y);
+drawingCtx.stroke();
+const angle=Math.atan2(pos.y-drawStart.y,pos.x-drawStart.x);
+const headLen=size*4;
+drawingCtx.beginPath();
+drawingCtx.moveTo(pos.x,pos.y);
+drawingCtx.lineTo(pos.x-headLen*Math.cos(angle-Math.PI/6),pos.y-headLen*Math.sin(angle-Math.PI/6));
+drawingCtx.lineTo(pos.x-headLen*Math.cos(angle+Math.PI/6),pos.y-headLen*Math.sin(angle+Math.PI/6));
+drawingCtx.closePath();
+drawingCtx.fill();
+drawings.push({type:'arrow',x1:drawStart.x,y1:drawStart.y,x2:pos.x,y2:pos.y,color,size});
+}else if(drawTool==='rect'){
+drawingCtx.strokeStyle=color;
+drawingCtx.lineWidth=size;
+const w=pos.x-drawStart.x;
+const h=pos.y-drawStart.y;
+drawingCtx.strokeRect(drawStart.x,drawStart.y,w,h);
+drawings.push({type:'rect',x:drawStart.x,y:drawStart.y,w,h,color,size});
+}else if(drawTool==='circle'){
+drawingCtx.strokeStyle=color;
+drawingCtx.lineWidth=size;
+const cx=(drawStart.x+pos.x)/2;
+const cy=(drawStart.y+pos.y)/2;
+const rx=Math.abs(pos.x-drawStart.x)/2;
+const ry=Math.abs(pos.y-drawStart.y)/2;
+drawingCtx.beginPath();
+drawingCtx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+drawingCtx.stroke();
+drawings.push({type:'circle',cx,cy,rx,ry,color,size});
+}
+previewCtx.clearRect(0,0,10000,10000);
+isDrawing=false;
+currentStroke=null;
+}
+}
+function drawPreview(mx,my,color,size){
+previewCtx.clearRect(0,0,10000,10000);
+previewCtx.strokeStyle=color;
+previewCtx.fillStyle=color;
+previewCtx.lineWidth=size;
+previewCtx.lineCap='round';
+previewCtx.setLineDash([5,5]);
+if(drawTool==='line'){
+previewCtx.beginPath();
+previewCtx.moveTo(drawStart.x,drawStart.y);
+previewCtx.lineTo(mx,my);
+previewCtx.stroke();
+}else if(drawTool==='arrow'){
+previewCtx.beginPath();
+previewCtx.moveTo(drawStart.x,drawStart.y);
+previewCtx.lineTo(mx,my);
+previewCtx.stroke();
+const angle=Math.atan2(my-drawStart.y,mx-drawStart.x);
+const headLen=size*4;
+previewCtx.setLineDash([]);
+previewCtx.beginPath();
+previewCtx.moveTo(mx,my);
+previewCtx.lineTo(mx-headLen*Math.cos(angle-Math.PI/6),my-headLen*Math.sin(angle-Math.PI/6));
+previewCtx.lineTo(mx-headLen*Math.cos(angle+Math.PI/6),my-headLen*Math.sin(angle+Math.PI/6));
+previewCtx.closePath();
+previewCtx.fill();
+}else if(drawTool==='rect'){
+previewCtx.strokeRect(drawStart.x,drawStart.y,mx-drawStart.x,my-drawStart.y);
+}else if(drawTool==='circle'){
+const cx=(drawStart.x+mx)/2;
+const cy=(drawStart.y+my)/2;
+const rx=Math.abs(mx-drawStart.x)/2;
+const ry=Math.abs(my-drawStart.y)/2;
+previewCtx.beginPath();
+previewCtx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+previewCtx.stroke();
+}
+previewCtx.setLineDash([]);
+}
+function handleWheel(e){e.preventDefault();const wrapper=document.getElementById('canvasWrapper');const rect=wrapper.getBoundingClientRect();const mx=e.clientX-rect.left;const my=e.clientY-rect.top;const oldZoom=zoom;zoom=Math.max(0.2,Math.min(3,zoom+(e.deltaY>0?-0.1:0.1)));const scale=zoom/oldZoom;pan.x=mx-(mx-pan.x)*scale;pan.y=my-(my-pan.y)*scale;updateCanvasTransform();document.getElementById('zoomLevel').textContent=Math.round(zoom*100)+'%';}
+function startConnection(e,nodeId,point){e.stopPropagation();e.preventDefault();connectingFrom=nodeId;connectingPoint=point;}
+function startEditing(el){el.contentEditable='true';el.focus();const range=document.createRange();range.selectNodeContents(el);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);}
+function stopEditing(el,nodeId){el.contentEditable='false';const node=nodes.find(n=>n.id===nodeId);if(node){node.text=el.innerText.trim()||'Вузол';renderTreeView();updateNodeProperties();}}
+function handleTextKeyDown(e,nodeId){
+if(e.key==='Enter'){
+e.preventDefault();
+const sel=window.getSelection();
+const range=sel.getRangeAt(0);
+const br=document.createElement('br');
+range.deleteContents();
+range.insertNode(br);
+range.setStartAfter(br);
+range.setEndAfter(br);
+sel.removeAllRanges();
+sel.addRange(range);
+}
+if(e.key==='Escape')e.target.blur();
+e.stopPropagation();
+}
+function handleKeyDown(e){if(e.target.tagName==='INPUT'||e.target.contentEditable==='true')return;if(e.code==='Space'){spacePressed=true;document.getElementById('canvasWrapper').style.cursor='grab';e.preventDefault();}if(e.key==='Delete'||e.key==='Backspace')deleteSelected();if(e.key==='Escape')hideContextMenu();}
+function handleKeyUp(e){if(e.code==='Space'){spacePressed=false;document.getElementById('canvasWrapper').style.cursor='';}}
+function showContextMenu(e){e.preventDefault();const menu=document.getElementById('contextMenu');menu.style.left=e.clientX+'px';menu.style.top=e.clientY+'px';menu.classList.remove('hidden');}
+function hideContextMenu(){document.getElementById('contextMenu').classList.add('hidden');}
+function zoomIn(){zoom=Math.min(zoom+0.1,3);updateCanvasTransform();document.getElementById('zoomLevel').textContent=Math.round(zoom*100)+'%';}
+function zoomOut(){zoom=Math.max(zoom-0.1,0.2);updateCanvasTransform();document.getElementById('zoomLevel').textContent=Math.round(zoom*100)+'%';}
+function centerView(){hideContextMenu();if(!nodes.length)return;let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;nodes.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+(n.width||120));maxY=Math.max(maxY,n.y+(n.height||40));});const wrapper=document.getElementById('canvasWrapper');pan.x=wrapper.offsetWidth/2-((minX+maxX)/2)*zoom;pan.y=wrapper.offsetHeight/2-((minY+maxY)/2)*zoom;updateCanvasTransform();}
+function toggleBrushMode(){brushMode=!brushMode;document.getElementById('brushModeBtn').classList.toggle('active',brushMode);document.getElementById('canvasWrapper').style.cursor=brushMode?'crosshair':'';}
+function setDrawTool(tool){drawTool=tool;document.querySelectorAll('.draw-tool-btn').forEach(b=>b.classList.remove('active'));document.querySelector(`[data-tool="${tool}"]`).classList.add('active');if(!brushMode){brushMode=true;document.getElementById('brushModeBtn').classList.add('active');document.getElementById('canvasWrapper').style.cursor='crosshair';}}
+function clearDrawing(){drawingCtx.clearRect(0,0,10000,10000);drawings=[];}
+function redrawAllStrokes(){
+drawingCtx.clearRect(0,0,10000,10000);
+drawings.forEach(d=>{
+drawingCtx.strokeStyle=d.color;
+drawingCtx.fillStyle=d.color;
+drawingCtx.lineWidth=d.size;
+drawingCtx.lineCap='round';
+drawingCtx.lineJoin='round';
+if(d.type==='brush'&&d.points&&d.points.length>1){
+drawingCtx.beginPath();
+drawingCtx.moveTo(d.points[0].x,d.points[0].y);
+for(let i=1;i<d.points.length;i++){drawingCtx.lineTo(d.points[i].x,d.points[i].y);}
+drawingCtx.stroke();
+}else if(d.type==='line'){
+drawingCtx.beginPath();
+drawingCtx.moveTo(d.x1,d.y1);
+drawingCtx.lineTo(d.x2,d.y2);
+drawingCtx.stroke();
+}else if(d.type==='arrow'){
+drawingCtx.beginPath();
+drawingCtx.moveTo(d.x1,d.y1);
+drawingCtx.lineTo(d.x2,d.y2);
+drawingCtx.stroke();
+const angle=Math.atan2(d.y2-d.y1,d.x2-d.x1);
+const headLen=d.size*4;
+drawingCtx.beginPath();
+drawingCtx.moveTo(d.x2,d.y2);
+drawingCtx.lineTo(d.x2-headLen*Math.cos(angle-Math.PI/6),d.y2-headLen*Math.sin(angle-Math.PI/6));
+drawingCtx.lineTo(d.x2-headLen*Math.cos(angle+Math.PI/6),d.y2-headLen*Math.sin(angle+Math.PI/6));
+drawingCtx.closePath();
+drawingCtx.fill();
+}else if(d.type==='rect'){
+drawingCtx.strokeRect(d.x,d.y,d.w,d.h);
+}else if(d.type==='circle'){
+drawingCtx.beginPath();
+if(d.cx!==undefined){drawingCtx.ellipse(d.cx,d.cy,d.rx||1,d.ry||1,0,0,Math.PI*2);}
+else{drawingCtx.arc(d.x,d.y,d.radius,0,Math.PI*2);}
+drawingCtx.stroke();
+}
+});
+}
+function openSettings(){document.getElementById('settingsModal').classList.remove('hidden');}
+function closeSettings(){document.getElementById('settingsModal').classList.add('hidden');}
+function openHelp(){document.getElementById('helpModal').classList.remove('hidden');}
+function closeHelp(){document.getElementById('helpModal').classList.add('hidden');}
+function toggleTheme(){isDarkTheme=!isDarkTheme;document.body.setAttribute('data-theme',isDarkTheme?'dark':'');document.getElementById('themeSwitch').classList.toggle('active',isDarkTheme);}
+function toggleGrid(){showGrid=!showGrid;document.getElementById('canvas').style.backgroundImage=showGrid?'linear-gradient(var(--canvas-grid) 1px,transparent 1px),linear-gradient(90deg,var(--canvas-grid) 1px,transparent 1px)':'none';document.getElementById('gridSwitch').classList.toggle('active',showGrid);}
+function updateMapName(){const name=document.getElementById('mapName').value;maps[currentMapIndex].name=name;document.title=name+' - ModeNode';renderTabs();}
+function updateNodeCount(){document.getElementById('nodeCount').textContent=`Вузлiв: ${nodes.length} | З'єдн: ${connections.length}`;}
+async function exportToPNG(){
+const canvas=document.createElement('canvas');
+const ctx=canvas.getContext('2d');
+let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+nodes.forEach(n=>{minX=Math.min(minX,n.x-20);minY=Math.min(minY,n.y-20);maxX=Math.max(maxX,n.x+(n.width||120)+20);maxY=Math.max(maxY,n.y+(n.height||40)+20);});
+drawings.forEach(d=>{
+if(d.type==='brush'&&d.points){d.points.forEach(p=>{minX=Math.min(minX,p.x-20);minY=Math.min(minY,p.y-20);maxX=Math.max(maxX,p.x+20);maxY=Math.max(maxY,p.y+20);});}
+else if(d.type==='line'||d.type==='arrow'){minX=Math.min(minX,d.x1-20,d.x2-20);minY=Math.min(minY,d.y1-20,d.y2-20);maxX=Math.max(maxX,d.x1+20,d.x2+20);maxY=Math.max(maxY,d.y1+20,d.y2+20);}
+else if(d.type==='rect'){minX=Math.min(minX,d.x-20);minY=Math.min(minY,d.y-20);maxX=Math.max(maxX,d.x+d.w+20);maxY=Math.max(maxY,d.y+d.h+20);}
+else if(d.type==='circle'){minX=Math.min(minX,d.x-d.radius-20);minY=Math.min(minY,d.y-d.radius-20);maxX=Math.max(maxX,d.x+d.radius+20);maxY=Math.max(maxY,d.y+d.radius+20);}
+});
+const pad=50;
+canvas.width=maxX-minX+pad*2;
+canvas.height=maxY-minY+pad*2;
+ctx.fillStyle=isDarkTheme?'#0f172a':'#f1f5f9';
+ctx.fillRect(0,0,canvas.width,canvas.height);
+ctx.lineCap='round';
+ctx.lineJoin='round';
+drawings.forEach(d=>{
+ctx.strokeStyle=d.color;
+ctx.fillStyle=d.color;
+ctx.lineWidth=d.size;
+if(d.type==='brush'&&d.points&&d.points.length>1){
+ctx.beginPath();
+ctx.moveTo(d.points[0].x-minX+pad,d.points[0].y-minY+pad);
+for(let i=1;i<d.points.length;i++){ctx.lineTo(d.points[i].x-minX+pad,d.points[i].y-minY+pad);}
+ctx.stroke();
+}else if(d.type==='line'){
+ctx.beginPath();
+ctx.moveTo(d.x1-minX+pad,d.y1-minY+pad);
+ctx.lineTo(d.x2-minX+pad,d.y2-minY+pad);
+ctx.stroke();
+}else if(d.type==='arrow'){
+ctx.beginPath();
+ctx.moveTo(d.x1-minX+pad,d.y1-minY+pad);
+ctx.lineTo(d.x2-minX+pad,d.y2-minY+pad);
+ctx.stroke();
+const angle=Math.atan2(d.y2-d.y1,d.x2-d.x1);
+const headLen=d.size*4;
+const ex=d.x2-minX+pad,ey=d.y2-minY+pad;
+ctx.beginPath();
+ctx.moveTo(ex,ey);
+ctx.lineTo(ex-headLen*Math.cos(angle-Math.PI/6),ey-headLen*Math.sin(angle-Math.PI/6));
+ctx.lineTo(ex-headLen*Math.cos(angle+Math.PI/6),ey-headLen*Math.sin(angle+Math.PI/6));
+ctx.closePath();
+ctx.fill();
+}else if(d.type==='rect'){
+ctx.strokeRect(d.x-minX+pad,d.y-minY+pad,d.w,d.h);
+}else if(d.type==='circle'){
+ctx.beginPath();
+if(d.cx!==undefined){ctx.ellipse(d.cx-minX+pad,d.cy-minY+pad,d.rx||1,d.ry||1,0,0,Math.PI*2);}
+else{ctx.arc(d.x-minX+pad,d.y-minY+pad,d.radius,0,Math.PI*2);}
+ctx.stroke();
+}
+});
+ctx.strokeStyle=isDarkTheme?'#94a3b8':'#64748b';
+ctx.lineWidth=2;
+connections.forEach(conn=>{
+const from=nodes.find(n=>n.id===conn.from);
+const to=nodes.find(n=>n.id===conn.to);
+if(!from||!to)return;
+const fp=getConnectionPoint(from,conn.fromPoint);
+const tp=getConnectionPoint(to,conn.toPoint);
+const x1=fp.x-minX+pad,y1=fp.y-minY+pad;
+const x2=tp.x-minX+pad,y2=tp.y-minY+pad;
+const dist=Math.sqrt((x2-x1)**2+(y2-y1)**2);
+const curv=Math.min(dist*0.4,80);
+let c1x=x1,c1y=y1,c2x=x2,c2y=y2;
+if(conn.fromPoint==='top')c1y-=curv;else if(conn.fromPoint==='bottom')c1y+=curv;else if(conn.fromPoint==='left')c1x-=curv;else c1x+=curv;
+if(conn.toPoint==='top')c2y-=curv;else if(conn.toPoint==='bottom')c2y+=curv;else if(conn.toPoint==='left')c2x-=curv;else c2x+=curv;
+ctx.beginPath();
+ctx.moveTo(x1,y1);
+ctx.bezierCurveTo(c1x,c1y,c2x,c2y,x2,y2);
+ctx.stroke();
+});
+for(const node of nodes){
+const x=node.x-minX+pad;
+const y=node.y-minY+pad;
+const w=node.width||120;
+const h=node.height||40;
+ctx.fillStyle=node.fillColor;
+ctx.strokeStyle=node.borderColor;
+ctx.lineWidth=node.borderWidth||2;
+ctx.beginPath();
+const r=node.shape==='rounded'||node.shape==='bubble'||node.shape==='cloud'?18:4;
+if(node.shape==='ellipse'||node.shape==='cloud'){ctx.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2);}
+else if(node.shape==='underline'){ctx.moveTo(x,y+h);ctx.lineTo(x+w,y+h);}
+else{ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);}
+ctx.closePath();
+if(node.shape!=='underline')ctx.fill();
+ctx.stroke();
+const isImgOnly=node.image&&node.imageOnly;
+if(isImgOnly){
+if(node.image){
+const img=new Image();
+img.src=node.image;
+await new Promise(res=>{img.onload=res;img.onerror=res;});
+ctx.save();
+ctx.clip();
+ctx.drawImage(img,x,y,w,h);
+ctx.restore();
+}
+}else{
+if(node.image){
+const img=new Image();
+img.src=node.image;
+await new Promise(res=>{img.onload=res;img.onerror=res;});
+const iw=Math.min(img.width,100);
+const ih=(img.height/img.width)*iw;
+ctx.drawImage(img,x+w/2-iw/2,y+5,iw,ih);
+}
+ctx.fillStyle=node.textColor;
+const fontSize=node.fontSize||14;
+ctx.font=`${node.italic?'italic ':''}${node.bold?'bold ':''}${fontSize}px ${node.font}`;
+ctx.textAlign='center';
+ctx.textBaseline='middle';
+const textMaxWidth = (node.width || 120) - 24; 
+const rawLines = node.text.split('\n');
+let lines = [];
+rawLines.forEach(line => {
+    const words = line.split(' ');
+    let currentLine = words[0];
+    for (let i = 1; i < words.length; i++) {
+        let word = words[i];
+        let width = ctx.measureText(currentLine + " " + word).width;
+        if (width < textMaxWidth) {
+            currentLine += " " + word;
+        } else {
+            lines.push(currentLine);
+            currentLine = word;
+        }
+    }
+    lines.push(currentLine);
+});
+const lineHeight = fontSize * 1.2;
+const totalHeight = lines.length * lineHeight;
+const startY = (node.image ? y + h - 15 - totalHeight/2 : y + h/2 - totalHeight/2) + lineHeight/2;
+lines.forEach((line,i)=>{
+    ctx.fillText(line,x+w/2,startY+i*lineHeight);
+});
+}
+}
+const link=document.createElement('a');
+link.download='mindmap.png';
+link.href=canvas.toDataURL('image/png');
+link.click();
+}
+function shareMap(){
+saveCurrentMap();
+const mapData=maps[currentMapIndex];
+const exportData={version:'1.0',name:mapData.name,nodes:mapData.nodes,connections:mapData.connections,drawings:mapData.drawings,nodeIdCounter:mapData.nodeIdCounter,exportDate:new Date().toISOString()};
+const json=JSON.stringify(exportData,null,2);
+const blob=new Blob([json],{type:'application/json'});
+const url=URL.createObjectURL(blob);
+const link=document.createElement('a');
+link.download=(mapData.name||'mindmap')+'.json';
+link.href=url;
+link.click();
+URL.revokeObjectURL(url);
+}
+function importMap(e){
+const file=e.target.files[0];
+if(!file)return;
+const reader=new FileReader();
+reader.onload=function(ev){
+try{
+const data=JSON.parse(ev.target.result);
+if(!data.nodes||!Array.isArray(data.nodes)){alert('Невiрний формат файлу');return;}
+saveCurrentMap();
+const mapId=++mapIdCounter;
+const mapData={id:mapId,name:data.name||'Iмпортована карта',nodes:data.nodes,connections:data.connections||[],nodeIdCounter:data.nodeIdCounter||data.nodes.length,drawings:data.drawings||[]};
+maps.push(mapData);
+currentMapIndex=maps.length-1;
+loadCurrentMap();
+if(nodes.length>0){const root=nodes.find(n=>n.isRoot)||nodes[0];centerOnNode(root);}
+renderTabs();
+closeSettings();
+}catch(err){alert('Помилка читання файлу: '+err.message);}
+};
+reader.readAsText(file);
+e.target.value='';
+}
+document.addEventListener('click',e=>{if(e.target.classList.contains('modal-overlay'))e.target.classList.add('hidden');});
+</script>
+</body>
+</html>
