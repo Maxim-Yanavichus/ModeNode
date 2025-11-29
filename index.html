@@ -11,7 +11,7 @@
 body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:var(--bg-primary);color:var(--text-primary);overflow:hidden;height:100vh;}
 .app-container{display:flex;flex-direction:column;height:100vh;}
 .toolbar{background-color:var(--bg-toolbar);border-bottom:1px solid var(--border-color);padding:6px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:8px;}
-.toolbar-left,.toolbar-right{display:flex;align-items:center;gap:6px;}
+.toolbar-left,.toolbar-right,.toolbar-center{display:flex;align-items:center;gap:6px;}
 .toolbar-group{display:flex;align-items:center;gap:4px;padding:0 8px;border-right:1px solid var(--border-color);}
 .toolbar-group:last-child{border-right:none;}
 .toolbar-btn{background-color:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);padding:6px 10px;cursor:pointer;transition:all 0.15s;font-size:12px;font-weight:500;border-radius:4px;white-space:nowrap;display:flex;align-items:center;gap:5px;}
@@ -116,6 +116,9 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 .center-btn{position:absolute;bottom:20px;right:20px;width:36px;height:36px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.1);z-index:900;color:var(--text-primary);}
 .center-btn:hover{background:var(--bg-toolbar);}
 .center-btn svg{width:20px;height:20px;fill:currentColor;}
+.snap-btn{position:absolute;bottom:20px;right:64px;width:36px;height:36px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.1);z-index:900;color:var(--text-primary);}
+.snap-btn:hover{background:var(--bg-toolbar);}
+.snap-btn.active{background:var(--node-border);color:white;border-color:var(--node-border);}
 .selection-box{position:absolute;border:2px dashed var(--node-border);background:rgba(59,130,246,0.1);z-index:1000;pointer-events:none;display:none;}
 .restore-btn-row{display:flex;gap:10px;margin-top:15px;}
 .restore-btn-row button{flex:1;padding:8px;}
@@ -150,6 +153,14 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 </div>
 </div>
 <div class="toolbar-right">
+<div class="toolbar-group" style="border-right:1px solid var(--border-color);margin-right:8px;padding-right:8px;">
+<button class="toolbar-btn" onclick="undo()" title="Скасувати (Ctrl+Z)">
+<svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+</button>
+<button class="toolbar-btn" onclick="redo()" title="Повторити (Ctrl+Y)">
+<svg viewBox="0 0 24 24"><path d="M18.4 10.6C16.55 9 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/></svg>
+</button>
+</div>
 <button class="toolbar-btn" onclick="openSettings()">Налаштування</button>
 <button class="toolbar-btn help-btn" onclick="openHelp()" title="Довiдка">?</button>
 </div>
@@ -161,6 +172,9 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 <div id="nodesContainer"></div>
 </div>
 <div id="selectionBox" class="selection-box"></div>
+<div class="snap-btn" id="snapBtn" onclick="toggleSnap()" title="Прив'язка до сiтки">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h7v7H4zM13 4h7v7h-7zM13 13h7v7h-7zM4 13h7v7H4z"/></svg>
+</div>
 <div class="center-btn" onclick="centerOnRoot()" title="До головної ідеї">
 <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-4-8c0 2.21 1.79 4 4 4s4-1.79 4-4-1.79-4-4-4-4 1.79-4 4z"/></svg>
 </div>
@@ -172,14 +186,14 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 </div>
 <div class="sidebar-section">
 <div class="sidebar-title">Кольори</div>
-<div class="color-row"><label>Контур:</label><input type="color" class="color-input" id="borderColor" value="#3b82f6" oninput="setNodeBorderColor(this.value)"></div>
-<div class="color-row"><label>Заливка:</label><input type="color" class="color-input" id="fillColor" value="#ffffff" oninput="setNodeFillColor(this.value)"></div>
-<div class="color-row"><label>Текст:</label><input type="color" class="color-input" id="textColor" value="#1e293b" oninput="setNodeTextColor(this.value)"></div>
-<div class="form-group"><label>Товщина контуру</label><div class="range-row"><input type="range" id="borderWidth" min="1" max="8" value="2" oninput="setNodeBorderWidth(this.value)"><span id="borderWidthVal">2</span></div></div>
+<div class="color-row"><label>Контур:</label><input type="color" class="color-input" id="borderColor" value="#3b82f6" oninput="saveState();setNodeBorderColor(this.value)"></div>
+<div class="color-row"><label>Заливка:</label><input type="color" class="color-input" id="fillColor" value="#ffffff" oninput="saveState();setNodeFillColor(this.value)"></div>
+<div class="color-row"><label>Текст:</label><input type="color" class="color-input" id="textColor" value="#1e293b" oninput="saveState();setNodeTextColor(this.value)"></div>
+<div class="form-group"><label>Товщина контуру</label><div class="range-row"><input type="range" id="borderWidth" min="1" max="8" value="2" oninput="saveState();setNodeBorderWidth(this.value)"><span id="borderWidthVal">2</span></div></div>
 </div>
 <div class="sidebar-section">
 <div class="sidebar-title">Форма</div>
-<select class="select-field" id="shapeSelect" onchange="setNodeShape(this.value)">
+<select class="select-field" id="shapeSelect" onchange="saveState();setNodeShape(this.value)">
 <option value="rectangle">Прямокутник</option>
 <option value="rounded">Закруглений</option>
 <option value="ellipse">Елiпс</option>
@@ -193,13 +207,13 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 <div class="form-group hidden" id="imageModeGroup" style="margin-top:10px;border-top:1px solid var(--border-color);padding-top:10px;">
 <div class="range-row" style="justify-content:space-between;">
 <label style="width:auto;color:var(--text-primary);">Тільки картинка</label>
-<div class="switch" id="imageOnlySwitch" onclick="toggleImageOnly()"></div>
+<div class="switch" id="imageOnlySwitch" onclick="saveState();toggleImageOnly()"></div>
 </div>
 </div>
 </div>
 <div class="sidebar-section">
 <div class="sidebar-title">Шрифт</div>
-<select class="select-field" id="fontSelect" onchange="setNodeFont(this.value)">
+<select class="select-field" id="fontSelect" onchange="saveState();setNodeFont(this.value)">
 <option value="Segoe UI">Segoe UI</option>
 <option value="Arial">Arial</option>
 <option value="Times New Roman">Times New Roman</option>
@@ -211,8 +225,8 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 <option value="Comic Sans MS">Comic Sans MS</option>
 <option value="Palatino">Palatino</option>
 </select>
-<div class="form-group" style="margin-top:5px;"><label>Розмiр тексту</label><div class="range-row"><input type="range" id="fontSize" min="7" max="45" value="7" oninput="setNodeFontSize(this.value)"><span id="fontSizeVal">Auto</span></div></div>
-<div class="btn-row"><button class="btn-small" id="boldBtn" onclick="toggleBold()">Жирний</button><button class="btn-small" id="italicBtn" onclick="toggleItalic()">Курсив</button></div>
+<div class="form-group" style="margin-top:5px;"><label>Розмiр тексту</label><div class="range-row"><input type="range" id="fontSize" min="7" max="45" value="7" oninput="saveState();setNodeFontSize(this.value)"><span id="fontSizeVal">Auto</span></div></div>
+<div class="btn-row"><button class="btn-small" id="boldBtn" onclick="saveState();toggleBold()">Жирний</button><button class="btn-small" id="italicBtn" onclick="saveState();toggleItalic()">Курсив</button></div>
 </div>
 <div class="sidebar-section" id="brushSection">
 <div class="sidebar-title">Пензлик</div>
@@ -293,7 +307,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 <li><b>Перетягування вузла</b> - перемiстити</li>
 <li><b>Shift + Клiк</b> - видiлити декiлька</li>
 <li><b>ЛКМ на фонi + Потягнути</b> - видiлити рамкою</li>
-<li><b>Кутовий маркер</b> - змiнити розмiр вузла</li>
+<li><b>Ctrl+Z / Ctrl+Y</b> - скасувати / повторити</li>
 <li><b>Space + ЛКМ / Середня кнопка</b> - рухати полотно</li>
 <li><b>Колесо мишi</b> - масштабування</li>
 <li><b>Delete</b> - видалити вузол</li>
@@ -303,7 +317,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
 <input type="file" id="audioInput" accept="audio/*" style="display:none" onchange="handleAudioUpload(event)">
 <script>
-let maps=[],currentMapIndex=0,nodes=[],connections=[],selectedNode=null,draggingNode=null,resizingNode=null,dragOffset={x:0,y:0},connectingFrom=null,connectingPoint=null,zoom=1,pan={x:0,y:0},isPanning=false,panStart={x:0,y:0},panOffset={x:0,y:0},nodeIdCounter=0,mapIdCounter=0,isDarkTheme=false,showGrid=true,spacePressed=false,brushMode=false,drawTool='line',isDrawing=false,drawStart={x:0,y:0},mainCtx=null,drawings=[],currentStroke=null,sessionStarted=false,selectedNodeIds=new Set();
+let maps=[],currentMapIndex=0,nodes=[],connections=[],selectedNode=null,draggingNode=null,resizingNode=null,dragOffset={x:0,y:0},connectingFrom=null,connectingPoint=null,zoom=1,pan={x:0,y:0},isPanning=false,panStart={x:0,y:0},panOffset={x:0,y:0},nodeIdCounter=0,mapIdCounter=0,isDarkTheme=false,showGrid=true,spacePressed=false,brushMode=false,drawTool='line',isDrawing=false,drawStart={x:0,y:0},mainCtx=null,drawings=[],currentStroke=null,sessionStarted=false,selectedNodeIds=new Set(),snapToGrid=false,historyStack=[],redoStack=[];
 let isExportSelecting=false, exportStart={x:0,y:0}, isMultiSelecting=false, selectionStart={x:0,y:0};
 document.addEventListener('DOMContentLoaded',()=>{
 const canvas = document.getElementById('mainCanvas');
@@ -363,6 +377,59 @@ if(!sessionStarted)return;
 const data={maps,currentMapIndex,mapIdCounter,isDarkTheme};
 localStorage.setItem('modeNodeData', JSON.stringify(data));
 }
+function saveState(){
+const state = {
+nodes: JSON.parse(JSON.stringify(nodes)),
+connections: JSON.parse(JSON.stringify(connections)),
+drawings: JSON.parse(JSON.stringify(drawings)),
+nodeIdCounter: nodeIdCounter
+};
+historyStack.push(state);
+if(historyStack.length > 50) historyStack.shift();
+redoStack = [];
+}
+function undo(){
+if(historyStack.length === 0) return;
+const currentState = {
+nodes: JSON.parse(JSON.stringify(nodes)),
+connections: JSON.parse(JSON.stringify(connections)),
+drawings: JSON.parse(JSON.stringify(drawings)),
+nodeIdCounter: nodeIdCounter
+};
+redoStack.push(currentState);
+const prevState = historyStack.pop();
+nodes = prevState.nodes;
+connections = prevState.connections;
+drawings = prevState.drawings;
+nodeIdCounter = prevState.nodeIdCounter;
+selectedNode = null;
+selectedNodeIds.clear();
+renderNodes();
+updateNodeProperties();
+}
+function redo(){
+if(redoStack.length === 0) return;
+const currentState = {
+nodes: JSON.parse(JSON.stringify(nodes)),
+connections: JSON.parse(JSON.stringify(connections)),
+drawings: JSON.parse(JSON.stringify(drawings)),
+nodeIdCounter: nodeIdCounter
+};
+historyStack.push(currentState);
+const nextState = redoStack.pop();
+nodes = nextState.nodes;
+connections = nextState.connections;
+drawings = nextState.drawings;
+nodeIdCounter = nextState.nodeIdCounter;
+selectedNode = null;
+selectedNodeIds.clear();
+renderNodes();
+updateNodeProperties();
+}
+function toggleSnap(){
+snapToGrid = !snapToGrid;
+document.getElementById('snapBtn').classList.toggle('active', snapToGrid);
+}
 function resizeCanvas(){
 const canvas = document.getElementById('mainCanvas');
 const wrapper = document.getElementById('canvasWrapper');
@@ -377,7 +444,7 @@ function createNewMap(){
 if(sessionStarted) saveCurrentMap();
 const mapId=++mapIdCounter;
 const mapData={id:mapId,name:'Карта '+mapId,nodes:[],connections:[],nodeIdCounter:0,drawings:[]};
-const rootNode={id:1,x:0,y:0,text:'Головна iдея',isRoot:true,borderColor:'#3b82f6',fillColor:'#ffffff',textColor:'#1e293b',borderWidth:2,shape:'rounded',font:'Segoe UI',fontSize:0,bold:true,italic:false,collapsed:false,image:null,audio:null,customWidth:null,customHeight:null,imageOnly:false};
+const rootNode={id:1,x:0,y:0,text:'Головна iдея',isRoot:true,borderColor:'#3b82f6',fillColor:'#ffffff',textColor:'#1e293b',borderWidth:2,shape:'rounded',font:'Segoe UI',fontSize:0,bold:true,italic:false,collapsed:false,image:null,audio:null,customWidth:200,customHeight:null,imageOnly:false};
 mapData.nodes.push(rootNode);
 mapData.nodeIdCounter=1;
 maps.push(mapData);
@@ -387,7 +454,7 @@ centerOnRoot();
 renderTabs();
 }
 function saveCurrentMap(){if(maps.length>0&&maps[currentMapIndex]){maps[currentMapIndex].nodes=JSON.parse(JSON.stringify(nodes));maps[currentMapIndex].connections=JSON.parse(JSON.stringify(connections));maps[currentMapIndex].nodeIdCounter=nodeIdCounter;maps[currentMapIndex].drawings=JSON.parse(JSON.stringify(drawings));}}
-function loadCurrentMap(){const map=maps[currentMapIndex];nodes=JSON.parse(JSON.stringify(map.nodes));connections=JSON.parse(JSON.stringify(map.connections));nodeIdCounter=map.nodeIdCounter;drawings=map.drawings?JSON.parse(JSON.stringify(map.drawings)):[];document.getElementById('mapName').value=map.name;selectedNode=null;selectedNodeIds.clear();renderNodes();updateNodeProperties();}
+function loadCurrentMap(){const map=maps[currentMapIndex];nodes=JSON.parse(JSON.stringify(map.nodes));connections=JSON.parse(JSON.stringify(map.connections));nodeIdCounter=map.nodeIdCounter;drawings=map.drawings?JSON.parse(JSON.stringify(map.drawings)):[];document.getElementById('mapName').value=map.name;selectedNode=null;selectedNodeIds.clear();renderNodes();updateNodeProperties();historyStack=[];redoStack=[];}
 function switchToMap(index){if(index===currentMapIndex)return;saveCurrentMap();currentMapIndex=index;loadCurrentMap();renderTabs();}
 function closeMap(index,e){e.stopPropagation();if(maps.length===1)return;maps.splice(index,1);if(currentMapIndex>=maps.length)currentMapIndex=maps.length-1;else if(index<currentMapIndex)currentMapIndex--;loadCurrentMap();renderTabs();}
 function renderTabs(){const tabsArea=document.getElementById('tabsArea');tabsArea.innerHTML='<button class="tab-add" onclick="createNewMap()" title="Нова карта">+</button>'+maps.map((m,i)=>`<div class="tab-item${i===currentMapIndex?' active':''}" onclick="switchToMap(${i})">${m.name}<span class="tab-close" onclick="closeMap(${i},event)">×</span></div>`).join('');}
@@ -696,8 +763,8 @@ const container=document.getElementById('nodeProperties');
 if(!selectedNode){container.innerHTML='<p style="color:var(--text-secondary);font-size:11px;">Оберiть вузол</p>';return;}
 container.innerHTML=`<div class="form-group"><label>Текст</label><input type="text" class="input-field" value="${selectedNode.text.replace(/"/g,'&quot;').replace(/\n/g,' ')}" onchange="updateNodeText(this.value)"></div><div class="form-group"><label>X / Y</label><div style="display:flex;gap:3px;"><input type="number" class="input-field" id="nodeXInput" value="${Math.round(selectedNode.x)}" onchange="updateNodePos('x',this.value)" style="flex:1"><input type="number" class="input-field" id="nodeYInput" value="${Math.round(selectedNode.y)}" onchange="updateNodePos('y',this.value)" style="flex:1"></div></div><div class="btn-row"><button class="btn-small" onclick="toggleCollapse()">Згорнути</button><button class="btn-small" onclick="duplicateNode()">Копiя</button></div>`;
 }
-function updateNodeText(text){if(selectedNode){selectedNode.text=text;renderNodes();}}
-function updateNodePos(axis,val){if(selectedNode){selectedNode[axis]=parseInt(val);renderNodes();}}
+function updateNodeText(text){if(selectedNode){saveState();selectedNode.text=text;renderNodes();}}
+function updateNodePos(axis,val){if(selectedNode){saveState();selectedNode[axis]=parseInt(val);renderNodes();}}
 function applyToSelectedNodes(callback){
 selectedNodeIds.forEach(id=>{
 const n = nodes.find(node=>node.id===id);
@@ -742,10 +809,11 @@ applyToSelectedNodes(n=>{if(n.image) n.imageOnly=newVal;});
 updateSidebarState();
 }
 }
-function toggleCollapse(){hideContextMenu();if(selectedNode&&hasChildren(selectedNode.id)){selectedNode.collapsed=!selectedNode.collapsed;renderNodes();}}
-function toggleCollapseNode(id,e){e.stopPropagation();const node=nodes.find(n=>n.id===id);if(node){node.collapsed=!node.collapsed;renderNodes();}}
+function toggleCollapse(){hideContextMenu();saveState();if(selectedNode&&hasChildren(selectedNode.id)){selectedNode.collapsed=!selectedNode.collapsed;renderNodes();}}
+function toggleCollapseNode(id,e){e.stopPropagation();saveState();const node=nodes.find(n=>n.id===id);if(node){node.collapsed=!node.collapsed;renderNodes();}}
 function addNode(){
 hideContextMenu();
+saveState();
 const wrapper=document.getElementById('canvasWrapper');
 const center = getWorldPos({x:wrapper.offsetWidth/2, y:wrapper.offsetHeight/2});
 const newNode=createNodeObject(center.x-60+Math.random()*40-20,center.y-20+Math.random()*40-20);
@@ -759,6 +827,7 @@ updateSidebarState();
 }
 function addChildNode(){
 hideContextMenu();
+saveState();
 let parentNode=selectedNode;
 if(!parentNode){parentNode=nodes.find(n=>n.isRoot);if(!parentNode)return;}
 if(parentNode.collapsed)parentNode.collapsed=false;
@@ -780,6 +849,7 @@ const file=e.target.files[0];
 if(!file)return;
 const reader=new FileReader();
 reader.onload=function(ev){
+saveState();
 const wrapper=document.getElementById('canvasWrapper');
 const center = getWorldPos({x:wrapper.offsetWidth/2, y:wrapper.offsetHeight/2});
 const newNode=createNodeObject(center.x-60,center.y-40,'Картинка');
@@ -800,6 +870,7 @@ const file=e.target.files[0];
 if(!file)return;
 const reader=new FileReader();
 reader.onload=function(ev){
+saveState();
 const wrapper=document.getElementById('canvasWrapper');
 const center = getWorldPos({x:wrapper.offsetWidth/2, y:wrapper.offsetHeight/2});
 const newNode=createNodeObject(center.x-60,center.y-40,'Аудiо');
@@ -818,6 +889,7 @@ e.target.value='';
 function duplicateNode(){
 hideContextMenu();
 if(!selectedNode)return;
+saveState();
 const selNodes = nodes.filter(n=>selectedNodeIds.has(n.id));
 selectedNodeIds.clear();
 selNodes.forEach(n=>{
@@ -833,6 +905,7 @@ updateSidebarState();
 function disconnectNode(){
 hideContextMenu();
 if(!selectedNode)return;
+saveState();
 selectedNodeIds.forEach(id=>{
 connections=connections.filter(c=>c.to!==id);
 });
@@ -841,6 +914,7 @@ renderNodes();
 function deleteSelected(){
 hideContextMenu();
 if(selectedNodeIds.size === 0) return;
+saveState();
 const idsToDelete = Array.from(selectedNodeIds);
 let cantDeleteRoot = false;
 idsToDelete.forEach(id=>{
@@ -855,11 +929,12 @@ selectedNode=null;
 renderNodes();
 updateNodeProperties();
 }
-function startResizing(e,node){e.stopPropagation();e.preventDefault();resizingNode=node;selectedNode=node;renderNodes();updateNodeProperties();updateSidebarState();}
+function startResizing(e,node){e.stopPropagation();e.preventDefault();saveState();resizingNode=node;selectedNode=node;renderNodes();updateNodeProperties();updateSidebarState();}
 function startDragging(e,node){
 if(e.target.classList.contains('connection-point')||e.target.classList.contains('node-children-indicator')||e.target.classList.contains('resize-handle'))return;
 if(spacePressed||e.button===1||brushMode||isExportSelecting)return;
 e.stopPropagation();
+saveState();
 if(!selectedNodeIds.has(node.id) && !e.shiftKey){
 selectedNodeIds.clear();
 selectedNodeIds.add(node.id);
@@ -872,7 +947,7 @@ selectedNode=node;
 }
 draggingNode=node;
 const pos = getWorldPos({x:e.clientX, y:e.clientY});
-dragOffset={x:pos.x, y:pos.y};
+dragOffset={x:pos.x-node.x, y:pos.y-node.y};
 renderNodes();
 updateNodeProperties();
 updateSidebarState();
@@ -902,6 +977,7 @@ box.style.display = 'block';
 return;
 }
 if(brushMode&&e.button===0&&!isNode){
+saveState();
 isDrawing=true;
 drawStart={x:pos.x,y:pos.y};
 tempMouse = {x:pos.x, y:pos.y};
@@ -972,13 +1048,20 @@ resizingNode.customHeight=newH;
 renderNodes();
 }
 if(draggingNode){
-const dx = worldPos.x - dragOffset.x;
-const dy = worldPos.y - dragOffset.y;
+let targetX = worldPos.x - dragOffset.x;
+let targetY = worldPos.y - dragOffset.y;
+if(snapToGrid){
+targetX = Math.round(targetX/20)*20;
+targetY = Math.round(targetY/20)*20;
+}
+const dx = targetX - draggingNode.x;
+const dy = targetY - draggingNode.y;
+if(dx !== 0 || dy !== 0){
 selectedNodeIds.forEach(id=>{
 const n = nodes.find(node=>node.id===id);
 if(n){n.x+=dx; n.y+=dy;}
 });
-dragOffset = {x:worldPos.x, y:worldPos.y};
+}
 if(document.getElementById('nodeXInput') && selectedNode){
 document.getElementById('nodeXInput').value=Math.round(selectedNode.x);
 document.getElementById('nodeYInput').value=Math.round(selectedNode.y);
@@ -1061,16 +1144,12 @@ box.style.display='none';
 const rect = wrapper.getBoundingClientRect();
 const endX = e.clientX;
 const endY = e.clientY;
-const left = Math.min(selectionStart.x, endX) - rect.left;
-const top = Math.min(selectionStart.y, endY) - rect.top;
-const right = Math.max(selectionStart.x, endX) - rect.left;
-const bottom = Math.max(selectionStart.y, endY) - rect.top;
 const startWorld = getWorldPos({x: Math.min(selectionStart.x, endX), y: Math.min(selectionStart.y, endY)});
 const endWorld = getWorldPos({x: Math.max(selectionStart.x, endX), y: Math.max(selectionStart.y, endY)});
 nodes.forEach(n => {
-const nodeRight = n.x + (n.width || 140);
+const nodeRight = n.x + (n.width || 60);
 const nodeBottom = n.y + (n.height || 40);
-if(n.x >= startWorld.x && nodeRight <= endWorld.x && n.y >= startWorld.y && nodeBottom <= endWorld.y){
+if(n.x + (n.width||60) >= startWorld.x && n.x <= endWorld.x && n.y + (n.height||40) >= startWorld.y && n.y <= endWorld.y){
 selectedNodeIds.add(n.id);
 selectedNode = n;
 }
@@ -1088,6 +1167,7 @@ if(target&&target.classList.contains('connection-point')){
 const toNodeId=parseInt(target.dataset.node);
 const toPoint=target.dataset.point;
 if(toNodeId!==connectingFrom){
+saveState();
 const exists=connections.some(c=>(c.from===connectingFrom&&c.to===toNodeId)||(c.from===toNodeId&&c.to===connectingFrom));
 if(!exists){connections.push({id:Date.now(),from:connectingFrom,to:toNodeId,fromPoint:connectingPoint,toPoint});updateNodeCount();}
 }
@@ -1136,6 +1216,7 @@ document.getElementById('zoomLevel').textContent = Math.round(zoom*100)+'%';
 }
 function startConnection(e,nodeId,point){e.stopPropagation();e.preventDefault();connectingFrom=nodeId;connectingPoint=point;}
 function startEditing(el){
+saveState();
 el.contentEditable='true';
 el.focus();
 const range = document.createRange();
@@ -1150,7 +1231,14 @@ function handleTextKeyDown(e,nodeId){
 e.stopPropagation();
 if(e.key==='Escape')e.target.blur();
 }
-function handleKeyDown(e){if(e.target.tagName==='INPUT'||e.target.contentEditable==='true')return;if(e.code==='Space'){spacePressed=true;document.getElementById('canvasWrapper').style.cursor='grab';e.preventDefault();}if(e.key==='Delete'||e.key==='Backspace')deleteSelected();if(e.key==='Escape')hideContextMenu();}
+function handleKeyDown(e){
+if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ'){e.preventDefault();undo();return;}
+if((e.ctrlKey||e.metaKey)&&e.code==='KeyY'){e.preventDefault();redo();return;}
+if(e.target.tagName==='INPUT'||e.target.contentEditable==='true')return;
+if(e.code==='Space'){spacePressed=true;document.getElementById('canvasWrapper').style.cursor='grab';e.preventDefault();}
+if(e.key==='Delete'||e.key==='Backspace')deleteSelected();
+if(e.key==='Escape')hideContextMenu();
+}
 function handleKeyUp(e){if(e.code==='Space'){spacePressed=false;document.getElementById('canvasWrapper').style.cursor='';}}
 function showContextMenu(e){e.preventDefault();const menu=document.getElementById('contextMenu');menu.style.left=e.clientX+'px';menu.style.top=e.clientY+'px';menu.classList.remove('hidden');}
 function hideContextMenu(){document.getElementById('contextMenu').classList.add('hidden');}
@@ -1182,7 +1270,7 @@ function centerView(){
 hideContextMenu();
 if(!nodes.length){pan={x:0,y:0};zoom=1;updateCanvasTransform();return;}
 let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-nodes.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+(n.width||140));maxY=Math.max(maxY,n.y+(n.height||40));});
+nodes.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+(n.width||60));maxY=Math.max(maxY,n.y+(n.height||40));});
 const wrapper=document.getElementById('canvasWrapper');
 const cx = (minX + maxX) / 2;
 const cy = (minY + maxY) / 2;
@@ -1194,7 +1282,7 @@ function centerOnRoot(){
 const root = nodes.find(n=>n.isRoot);
 if(root){
 const wrapper=document.getElementById('canvasWrapper');
-pan.x = wrapper.offsetWidth/2 - (root.x + (root.width||140)/2)*zoom;
+pan.x = wrapper.offsetWidth/2 - (root.x + (root.width||60)/2)*zoom;
 pan.y = wrapper.offsetHeight/2 - (root.y + (root.height||40)/2)*zoom;
 updateCanvasTransform();
 } else {
@@ -1203,7 +1291,7 @@ centerView();
 }
 function toggleBrushMode(){brushMode=!brushMode;document.getElementById('brushModeBtn').classList.toggle('active',brushMode);document.getElementById('canvasWrapper').style.cursor=brushMode?'crosshair':'';}
 function setDrawTool(tool){drawTool=tool;document.querySelectorAll('.draw-tool-btn').forEach(b=>b.classList.remove('active'));document.querySelector(`[data-tool="${tool}"]`).classList.add('active');if(!brushMode){brushMode=true;document.getElementById('brushModeBtn').classList.add('active');document.getElementById('canvasWrapper').style.cursor='crosshair';}}
-function clearDrawing(){drawings=[];}
+function clearDrawing(){saveState();drawings=[];}
 function redrawAllStrokes(){}
 function openSettings(){document.getElementById('settingsModal').classList.remove('hidden');}
 function closeSettings(){document.getElementById('settingsModal').classList.add('hidden');}
@@ -1234,13 +1322,13 @@ ctx.fillRect(0,0,w,h);
 ctx.translate(-x, -y);
 ctx.translate(pan.x, pan.y);
 ctx.scale(zoom, zoom);
-drawWorldOnContext(ctx); 
+await drawWorldOnContext(ctx); 
 const link = document.createElement('a');
 link.download = 'mindmap-selection.png';
 link.href = canvas.toDataURL('image/png');
 link.click();
 }
-function drawWorldOnContext(ctx){
+async function drawWorldOnContext(ctx){
 ctx.strokeStyle = isDarkTheme ? '#94a3b8' : '#64748b';
 ctx.lineWidth = 2;
 connections.forEach(conn=>{
@@ -1300,156 +1388,10 @@ else{ctx.arc(d.x,d.y,d.radius,0,Math.PI*2);}
 ctx.stroke();
 }
 });
-nodes.forEach(node=>{
-const x=node.x;
-const y=node.y;
-const w=node.width||140;
-const h=node.height||40;
-ctx.fillStyle=node.fillColor;
-ctx.strokeStyle=node.borderColor;
-ctx.lineWidth=node.borderWidth||2;
-ctx.beginPath();
-const r=node.shape==='rounded'||node.shape==='bubble'||node.shape==='cloud'?18:4;
-if(node.shape==='ellipse'||node.shape==='cloud'){ctx.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2);}
-else if(node.shape==='underline'){ctx.moveTo(x,y+h);ctx.lineTo(x+w,y+h);}
-else{ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);}
-ctx.closePath();
-if(node.shape!=='underline')ctx.fill();
-ctx.stroke();
-if(node.image){
-const img=new Image();
-img.src=node.image;
-try{
-if(node.imageOnly){
-ctx.save();
-ctx.clip();
-ctx.drawImage(img,x,y,w,h);
-ctx.restore();
-} else {
-const iw=Math.min(img.width,100);
-const ih=(img.height/img.width)*iw;
-ctx.drawImage(img,x+w/2-iw/2,y+5,iw,ih);
-}
-}catch(e){}
-}
-if(!node.imageOnly){
-ctx.fillStyle=node.textColor;
-let fontSize = node.fontSize || 14;
-if(node.fontSize === 0 || node.fontSize === 'auto') {
-fontSize = Math.max(12, Math.min(36, w / 8));
-}
-ctx.font=`${node.italic?'italic ':''}${node.bold?'bold ':''}${fontSize}px ${node.font}`;
-ctx.textAlign='center';
-ctx.textBaseline='middle';
-const textMaxWidth = w - 24; 
-const rawLines = node.text.split('\n');
-let lines = [];
-rawLines.forEach(line => {
-const words = line.split(' ');
-let currentLine = words[0];
-for (let i = 1; i < words.length; i++) {
-let word = words[i];
-let width = ctx.measureText(currentLine + " " + word).width;
-if (width < textMaxWidth) {
-currentLine += " " + word;
-} else {
-lines.push(currentLine);
-currentLine = word;
-}
-}
-lines.push(currentLine);
-});
-const lineHeight = fontSize * 1.2;
-const totalHeight = lines.length * lineHeight;
-const startY = (node.image ? y + h - 15 - totalHeight/2 : y + h/2 - totalHeight/2) + lineHeight/2;
-lines.forEach((line,i)=>{
-ctx.fillText(line,x+w/2,startY+i*lineHeight);
-});
-}
-});
-}
-async function exportToPNG(){
-const canvas=document.createElement('canvas');
-const ctx=canvas.getContext('2d');
-let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-nodes.forEach(n=>{minX=Math.min(minX,n.x-20);minY=Math.min(minY,n.y-20);maxX=Math.max(maxX,n.x+(n.width||140)+20);maxY=Math.max(maxY,n.y+(n.height||40)+20);});
-drawings.forEach(d=>{
-if((d.type==='brush'||d.type==='pencil')&&d.points){d.points.forEach(p=>{minX=Math.min(minX,p.x-20);minY=Math.min(minY,p.y-20);maxX=Math.max(maxX,p.x+20);maxY=Math.max(maxY,p.y+20);});}
-else if(d.type==='line'||d.type==='arrow'){minX=Math.min(minX,d.x1-20,d.x2-20);minY=Math.min(minY,d.y1-20,d.y2-20);maxX=Math.max(maxX,d.x1+20,d.x2+20);maxY=Math.max(maxY,d.y1+20,d.y2+20);}
-else if(d.type==='rect'){minX=Math.min(minX,d.x-20);minY=Math.min(minY,d.y-20);maxX=Math.max(maxX,d.x+d.w+20);maxY=Math.max(maxY,d.y+d.h+20);}
-else if(d.type==='circle'){minX=Math.min(minX,d.x-d.radius-20);minY=Math.min(minY,d.y-d.radius-20);maxX=Math.max(maxX,d.x+d.radius+20);maxY=Math.max(maxY,d.y+d.radius+20);}
-});
-if(minX === Infinity) { minX=0; maxX=800; minY=0; maxY=600; }
-const pad=50;
-canvas.width=maxX-minX+pad*2;
-canvas.height=maxY-minY+pad*2;
-ctx.fillStyle=isDarkTheme?'#0f172a':'#f1f5f9';
-ctx.fillRect(0,0,canvas.width,canvas.height);
-ctx.translate(-minX+pad, -minY+pad);
-await new Promise(r=>setTimeout(r, 100)); 
-ctx.strokeStyle=isDarkTheme?'#94a3b8':'#64748b';
-ctx.lineWidth=2;
-connections.forEach(conn=>{
-const from=nodes.find(n=>n.id===conn.from);
-const to=nodes.find(n=>n.id===conn.to);
-if(!from||!to)return;
-const fp=getConnectionPoint(from,conn.fromPoint);
-const tp=getConnectionPoint(to,conn.toPoint);
-const dist=Math.sqrt((tp.x-fp.x)**2+(tp.y-fp.y)**2);
-const curv=Math.min(dist*0.4,80);
-let c1={...fp},c2={...tp};
-if(conn.fromPoint==='top')c1.y-=curv;else if(conn.fromPoint==='bottom')c1.y+=curv;else if(conn.fromPoint==='left')c1.x-=curv;else c1.x+=curv;
-if(conn.toPoint==='top')c2.y-=curv;else if(conn.toPoint==='bottom')c2.y+=curv;else if(conn.toPoint==='left')c2.x-=curv;else c2.x+=curv;
-ctx.beginPath();
-ctx.moveTo(fp.x, fp.y);
-ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, tp.x, tp.y);
-ctx.stroke();
-});
-drawings.forEach(d=>{
-ctx.strokeStyle=d.color;
-ctx.fillStyle=d.color;
-ctx.lineWidth=d.size;
-ctx.lineCap='round';
-ctx.lineJoin='round';
-if((d.type==='brush'||d.type==='pencil')&&d.points&&d.points.length>1){
-ctx.beginPath();
-ctx.moveTo(d.points[0].x,d.points[0].y);
-for(let i=1;i<d.points.length;i++){ctx.lineTo(d.points[i].x,d.points[i].y);}
-ctx.stroke();
-}else if(d.type==='line'){
-ctx.beginPath();
-ctx.moveTo(d.x1,d.y1);
-ctx.lineTo(d.x2,d.y2);
-ctx.stroke();
-}else if(d.type==='arrow'){
-const angle=Math.atan2(d.y2-d.y1,d.x2-d.x1);
-const headLen=d.size*4;
-const ex = d.x2 - headLen * Math.cos(angle) * 0.8;
-const ey = d.y2 - headLen * Math.sin(angle) * 0.8;
-ctx.beginPath();
-ctx.moveTo(d.x1,d.y1);
-ctx.lineTo(ex, ey);
-ctx.stroke();
-const ex2=d.x2, ey2=d.y2;
-ctx.beginPath();
-ctx.moveTo(ex2,ey2);
-ctx.lineTo(ex2-headLen*Math.cos(angle-Math.PI/6),ey2-headLen*Math.sin(angle-Math.PI/6));
-ctx.lineTo(ex2-headLen*Math.cos(angle+Math.PI/6),ey2-headLen*Math.sin(angle+Math.PI/6));
-ctx.closePath();
-ctx.fill();
-}else if(d.type==='rect'){
-ctx.strokeRect(d.x,d.y,d.w,d.h);
-}else if(d.type==='circle'){
-ctx.beginPath();
-if(d.cx!==undefined){ctx.ellipse(d.cx,d.cy,d.rx||1,d.ry||1,0,0,Math.PI*2);}
-else{ctx.arc(d.x,d.y,d.radius,0,Math.PI*2);}
-ctx.stroke();
-}
-});
 for(const node of nodes){
 const x=node.x;
 const y=node.y;
-const w=node.width||140;
+const w=node.width||60;
 const h=node.height||40;
 ctx.fillStyle=node.fillColor;
 ctx.strokeStyle=node.borderColor;
@@ -1514,6 +1456,26 @@ ctx.fillText(line,x+w/2,startY+i*lineHeight);
 });
 }
 }
+}
+async function exportToPNG(){
+const canvas=document.createElement('canvas');
+const ctx=canvas.getContext('2d');
+let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+nodes.forEach(n=>{minX=Math.min(minX,n.x-20);minY=Math.min(minY,n.y-20);maxX=Math.max(maxX,n.x+(n.width||60)+20);maxY=Math.max(maxY,n.y+(n.height||40)+20);});
+drawings.forEach(d=>{
+if((d.type==='brush'||d.type==='pencil')&&d.points){d.points.forEach(p=>{minX=Math.min(minX,p.x-20);minY=Math.min(minY,p.y-20);maxX=Math.max(maxX,p.x+20);maxY=Math.max(maxY,p.y+20);});}
+else if(d.type==='line'||d.type==='arrow'){minX=Math.min(minX,d.x1-20,d.x2-20);minY=Math.min(minY,d.y1-20,d.y2-20);maxX=Math.max(maxX,d.x1+20,d.x2+20);maxY=Math.max(maxY,d.y1+20,d.y2+20);}
+else if(d.type==='rect'){minX=Math.min(minX,d.x-20);minY=Math.min(minY,d.y-20);maxX=Math.max(maxX,d.x+d.w+20);maxY=Math.max(maxY,d.y+d.h+20);}
+else if(d.type==='circle'){minX=Math.min(minX,d.x-d.radius-20);minY=Math.min(minY,d.y-d.radius-20);maxX=Math.max(maxX,d.x+d.radius+20);maxY=Math.max(maxY,d.y+d.radius+20);}
+});
+if(minX === Infinity) { minX=0; maxX=800; minY=0; maxY=600; }
+const pad=50;
+canvas.width=maxX-minX+pad*2;
+canvas.height=maxY-minY+pad*2;
+ctx.fillStyle=isDarkTheme?'#0f172a':'#f1f5f9';
+ctx.fillRect(0,0,canvas.width,canvas.height);
+ctx.translate(-minX+pad, -minY+pad);
+await drawWorldOnContext(ctx);
 const link=document.createElement('a');
 link.download='mindmap.png';
 link.href=canvas.toDataURL('image/png');
