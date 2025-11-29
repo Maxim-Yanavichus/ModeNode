@@ -28,7 +28,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 .nodes-layer{position:absolute;top:0;left:0;width:0;height:0;z-index:2;transform-origin:0 0;overflow:visible;}
 .node{position:absolute;background-color:var(--node-bg);cursor:move;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:box-shadow 0.2s;display:flex;align-items:center;justify-content:center;flex-direction:column;border-style:solid;min-width:140px;padding:8px 12px;}
 .node:hover{box-shadow:0 4px 16px rgba(0,0,0,0.15);}
-.node.selected{box-shadow:0 0 0 3px rgba(59,130,246,0.4);}
+.node.selected{box-shadow:0 0 0 3px rgba(59,130,246,0.6); z-index: 100;}
 .node.shape-rectangle{border-radius:4px;}
 .node.shape-rounded{border-radius:20px;}
 .node.shape-ellipse{border-radius:50%;}
@@ -291,23 +291,20 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 <ul class="help-list">
 <li><b>Подвiйний клiк на полотнi</b> - зняти видiлення</li>
 <li><b>Перетягування вузла</b> - перемiстити</li>
+<li><b>Shift + Клiк</b> - видiлити декiлька</li>
+<li><b>ЛКМ на фонi + Потягнути</b> - видiлити рамкою</li>
 <li><b>Кутовий маркер</b> - змiнити розмiр вузла</li>
 <li><b>Space + ЛКМ / Середня кнопка</b> - рухати полотно</li>
 <li><b>Колесо мишi</b> - масштабування</li>
-<li><b>Точки з'єднання</b> - перетягнiть для зв'язку</li>
 <li><b>Delete</b> - видалити вузол</li>
-<li><b>Права кнопка</b> - контекстне меню</li>
-<li><b>Згорнути</b> - приховати дочiрнi вузли</li>
-<li><b>+ внизу</b> - створити нову карту</li>
-<li><b>Пензлик</b> - режим малювання</li>
 </ul>
 </div>
 </div>
 <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
 <input type="file" id="audioInput" accept="audio/*" style="display:none" onchange="handleAudioUpload(event)">
 <script>
-let maps=[],currentMapIndex=0,nodes=[],connections=[],selectedNode=null,draggingNode=null,resizingNode=null,dragOffset={x:0,y:0},connectingFrom=null,connectingPoint=null,zoom=1,pan={x:0,y:0},isPanning=false,panStart={x:0,y:0},panOffset={x:0,y:0},nodeIdCounter=0,mapIdCounter=0,isDarkTheme=false,showGrid=true,spacePressed=false,brushMode=false,drawTool='line',isDrawing=false,drawStart={x:0,y:0},mainCtx=null,drawings=[],currentStroke=null,sessionStarted=false;
-let isExportSelecting=false, exportStart={x:0,y:0};
+let maps=[],currentMapIndex=0,nodes=[],connections=[],selectedNode=null,draggingNode=null,resizingNode=null,dragOffset={x:0,y:0},connectingFrom=null,connectingPoint=null,zoom=1,pan={x:0,y:0},isPanning=false,panStart={x:0,y:0},panOffset={x:0,y:0},nodeIdCounter=0,mapIdCounter=0,isDarkTheme=false,showGrid=true,spacePressed=false,brushMode=false,drawTool='line',isDrawing=false,drawStart={x:0,y:0},mainCtx=null,drawings=[],currentStroke=null,sessionStarted=false,selectedNodeIds=new Set();
+let isExportSelecting=false, exportStart={x:0,y:0}, isMultiSelecting=false, selectionStart={x:0,y:0};
 document.addEventListener('DOMContentLoaded',()=>{
 const canvas = document.getElementById('mainCanvas');
 mainCtx = canvas.getContext('2d');
@@ -348,6 +345,7 @@ if(maps.length===0){createNewMap();}
 else{
 loadCurrentMap();
 renderTabs();
+centerOnRoot();
 }
 if(isDarkTheme){document.body.setAttribute('data-theme','dark');document.getElementById('themeSwitch').classList.add('active');}
 }
@@ -389,7 +387,7 @@ centerOnRoot();
 renderTabs();
 }
 function saveCurrentMap(){if(maps.length>0&&maps[currentMapIndex]){maps[currentMapIndex].nodes=JSON.parse(JSON.stringify(nodes));maps[currentMapIndex].connections=JSON.parse(JSON.stringify(connections));maps[currentMapIndex].nodeIdCounter=nodeIdCounter;maps[currentMapIndex].drawings=JSON.parse(JSON.stringify(drawings));}}
-function loadCurrentMap(){const map=maps[currentMapIndex];nodes=JSON.parse(JSON.stringify(map.nodes));connections=JSON.parse(JSON.stringify(map.connections));nodeIdCounter=map.nodeIdCounter;drawings=map.drawings?JSON.parse(JSON.stringify(map.drawings)):[];document.getElementById('mapName').value=map.name;renderNodes();updateNodeProperties();}
+function loadCurrentMap(){const map=maps[currentMapIndex];nodes=JSON.parse(JSON.stringify(map.nodes));connections=JSON.parse(JSON.stringify(map.connections));nodeIdCounter=map.nodeIdCounter;drawings=map.drawings?JSON.parse(JSON.stringify(map.drawings)):[];document.getElementById('mapName').value=map.name;selectedNode=null;selectedNodeIds.clear();renderNodes();updateNodeProperties();}
 function switchToMap(index){if(index===currentMapIndex)return;saveCurrentMap();currentMapIndex=index;loadCurrentMap();renderTabs();}
 function closeMap(index,e){e.stopPropagation();if(maps.length===1)return;maps.splice(index,1);if(currentMapIndex>=maps.length)currentMapIndex=maps.length-1;else if(index<currentMapIndex)currentMapIndex--;loadCurrentMap();renderTabs();}
 function renderTabs(){const tabsArea=document.getElementById('tabsArea');tabsArea.innerHTML='<button class="tab-add" onclick="createNewMap()" title="Нова карта">+</button>'+maps.map((m,i)=>`<div class="tab-item${i===currentMapIndex?' active':''}" onclick="switchToMap(${i})">${m.name}<span class="tab-close" onclick="closeMap(${i},event)">×</span></div>`).join('');}
@@ -405,7 +403,8 @@ container.innerHTML='';
 const visible=getVisibleNodes();
 visible.forEach(node=>{
 const el=document.createElement('div');
-el.className=`node shape-${node.shape}${selectedNode?.id===node.id?' selected':''}${node.collapsed?' collapsed':''}`;
+const isSel = selectedNodeIds.has(node.id);
+el.className=`node shape-${node.shape}${isSel?' selected':''}${node.collapsed?' collapsed':''}`;
 el.id=`node-${node.id}`;
 el.style.left=node.x+'px';
 el.style.top=node.y+'px';
@@ -628,13 +627,47 @@ function renderTreeView(){
 const tree=document.getElementById('treeView');
 if(!nodes.length){tree.innerHTML='<p style="color:var(--text-secondary);font-size:10px;">Порожньо</p>';return;}
 tree.innerHTML=nodes.map(n=>{
-const sel=selectedNode?.id===n.id?' selected':'';
+const sel=selectedNodeIds.has(n.id)?' selected':'';
 const exp=hasChildren(n.id)?(n.collapsed?'▸':'▾'):'·';
 return`<div class="tree-item${sel}" onclick="selectNodeById(${n.id})"><span class="tree-expand">${exp}</span>${n.text.substring(0,18)}${n.text.length>18?'...':''}</div>`;
 }).join('');
 }
-function selectNodeById(id){const node=nodes.find(n=>n.id===id);if(node){selectedNode=node;renderNodes();updateNodeProperties();updateSidebarState();}}
-function selectNode(e,node){e.stopPropagation();selectedNode=node;renderNodes();updateNodeProperties();updateSidebarState();}
+function selectNodeById(id){
+const node=nodes.find(n=>n.id===id);
+if(node){
+selectedNodeIds.clear();
+selectedNodeIds.add(id);
+selectedNode=node;
+renderNodes();
+updateNodeProperties();
+updateSidebarState();
+}
+}
+function selectNode(e,node){
+e.stopPropagation();
+if(e.shiftKey){
+if(selectedNodeIds.has(node.id)){
+selectedNodeIds.delete(node.id);
+if(selectedNode && selectedNode.id===node.id){
+selectedNode = selectedNodeIds.size > 0 ? nodes.find(n=>n.id===Array.from(selectedNodeIds).pop()) : null;
+}
+} else {
+selectedNodeIds.add(node.id);
+selectedNode=node;
+}
+} else {
+if(!selectedNodeIds.has(node.id)){
+selectedNodeIds.clear();
+selectedNodeIds.add(node.id);
+selectedNode=node;
+} else {
+selectedNode=node;
+}
+}
+renderNodes();
+updateNodeProperties();
+updateSidebarState();
+}
 function updateSidebarState(){
 if(!selectedNode)return;
 document.getElementById('borderColor').value=selectedNode.borderColor;
@@ -665,24 +698,50 @@ container.innerHTML=`<div class="form-group"><label>Текст</label><input typ
 }
 function updateNodeText(text){if(selectedNode){selectedNode.text=text;renderNodes();}}
 function updateNodePos(axis,val){if(selectedNode){selectedNode[axis]=parseInt(val);renderNodes();}}
-function setNodeBorderColor(c){if(selectedNode){selectedNode.borderColor=c;renderNodes();}}
-function setNodeFillColor(c){if(selectedNode){selectedNode.fillColor=c;renderNodes();}}
-function setNodeTextColor(c){if(selectedNode){selectedNode.textColor=c;renderNodes();}}
-function setNodeBorderWidth(w){if(selectedNode){selectedNode.borderWidth=parseInt(w);document.getElementById('borderWidthVal').textContent=w;renderNodes();}}
-function setNodeShape(s){if(selectedNode){selectedNode.shape=s;renderNodes();}}
-function setNodeFont(f){if(selectedNode){selectedNode.font=f;renderNodes();}}
-function setNodeFontSize(s){
-if(selectedNode){
-let v = parseInt(s);
-if(v <= 7) v = 0;
-selectedNode.fontSize = v;
-document.getElementById('fontSizeVal').textContent= v === 0 ? "Auto" : v;
+function applyToSelectedNodes(callback){
+selectedNodeIds.forEach(id=>{
+const n = nodes.find(node=>node.id===id);
+if(n) callback(n);
+});
 renderNodes();
 }
+function setNodeBorderColor(c){applyToSelectedNodes(n=>n.borderColor=c);}
+function setNodeFillColor(c){applyToSelectedNodes(n=>n.fillColor=c);}
+function setNodeTextColor(c){applyToSelectedNodes(n=>n.textColor=c);}
+function setNodeBorderWidth(w){
+const width = parseInt(w);
+document.getElementById('borderWidthVal').textContent=w;
+applyToSelectedNodes(n=>n.borderWidth=width);
 }
-function toggleBold(){if(selectedNode){selectedNode.bold=!selectedNode.bold;renderNodes();updateSidebarState();}}
-function toggleItalic(){if(selectedNode){selectedNode.italic=!selectedNode.italic;renderNodes();updateSidebarState();}}
-function toggleImageOnly(){if(selectedNode&&selectedNode.image){selectedNode.imageOnly=!selectedNode.imageOnly;renderNodes();updateSidebarState();}}
+function setNodeShape(s){applyToSelectedNodes(n=>n.shape=s);}
+function setNodeFont(f){applyToSelectedNodes(n=>n.font=f);}
+function setNodeFontSize(s){
+let v = parseInt(s);
+if(v <= 7) v = 0;
+document.getElementById('fontSizeVal').textContent= v === 0 ? "Auto" : v;
+applyToSelectedNodes(n=>n.fontSize=v);
+}
+function toggleBold(){
+if(selectedNode){
+const newVal = !selectedNode.bold;
+applyToSelectedNodes(n=>n.bold=newVal);
+updateSidebarState();
+}
+}
+function toggleItalic(){
+if(selectedNode){
+const newVal = !selectedNode.italic;
+applyToSelectedNodes(n=>n.italic=newVal);
+updateSidebarState();
+}
+}
+function toggleImageOnly(){
+if(selectedNode && selectedNode.image){
+const newVal = !selectedNode.imageOnly;
+applyToSelectedNodes(n=>{if(n.image) n.imageOnly=newVal;});
+updateSidebarState();
+}
+}
 function toggleCollapse(){hideContextMenu();if(selectedNode&&hasChildren(selectedNode.id)){selectedNode.collapsed=!selectedNode.collapsed;renderNodes();}}
 function toggleCollapseNode(id,e){e.stopPropagation();const node=nodes.find(n=>n.id===id);if(node){node.collapsed=!node.collapsed;renderNodes();}}
 function addNode(){
@@ -691,6 +750,8 @@ const wrapper=document.getElementById('canvasWrapper');
 const center = getWorldPos({x:wrapper.offsetWidth/2, y:wrapper.offsetHeight/2});
 const newNode=createNodeObject(center.x-60+Math.random()*40-20,center.y-20+Math.random()*40-20);
 nodes.push(newNode);
+selectedNodeIds.clear();
+selectedNodeIds.add(newNode.id);
 selectedNode=newNode;
 renderNodes();
 updateNodeProperties();
@@ -705,6 +766,8 @@ const childCount=connections.filter(c=>c.from===parentNode.id).length;
 const newNode=createNodeObject(parentNode.x+(parentNode.width||140)+60,parentNode.y+childCount*50);
 nodes.push(newNode);
 connections.push({id:Date.now(),from:parentNode.id,to:newNode.id,fromPoint:'right',toPoint:'left'});
+selectedNodeIds.clear();
+selectedNodeIds.add(newNode.id);
 selectedNode=newNode;
 renderNodes();
 updateNodeProperties();
@@ -722,6 +785,8 @@ const center = getWorldPos({x:wrapper.offsetWidth/2, y:wrapper.offsetHeight/2});
 const newNode=createNodeObject(center.x-60,center.y-40,'Картинка');
 newNode.image=ev.target.result;
 nodes.push(newNode);
+selectedNodeIds.clear();
+selectedNodeIds.add(newNode.id);
 selectedNode=newNode;
 renderNodes();
 updateNodeProperties();
@@ -740,6 +805,8 @@ const center = getWorldPos({x:wrapper.offsetWidth/2, y:wrapper.offsetHeight/2});
 const newNode=createNodeObject(center.x-60,center.y-40,'Аудiо');
 newNode.audio=ev.target.result;
 nodes.push(newNode);
+selectedNodeIds.clear();
+selectedNodeIds.add(newNode.id);
 selectedNode=newNode;
 renderNodes();
 updateNodeProperties();
@@ -748,18 +815,64 @@ updateSidebarState();
 reader.readAsDataURL(file);
 e.target.value='';
 }
-function duplicateNode(){hideContextMenu();if(!selectedNode)return;const newNode={...selectedNode,id:++nodeIdCounter,x:selectedNode.x+30,y:selectedNode.y+30,text:selectedNode.text+' (копiя)',isRoot:false};nodes.push(newNode);selectedNode=newNode;renderNodes();updateNodeProperties();updateSidebarState();}
-function disconnectNode(){hideContextMenu();if(!selectedNode)return;connections=connections.filter(c=>c.to!==selectedNode.id);renderNodes();}
-function deleteSelected(){hideContextMenu();if(!selectedNode)return;if(selectedNode.isRoot&&nodes.length>1)return;connections=connections.filter(c=>c.from!==selectedNode.id&&c.to!==selectedNode.id);nodes=nodes.filter(n=>n.id!==selectedNode.id);selectedNode=null;renderNodes();updateNodeProperties();}
+function duplicateNode(){
+hideContextMenu();
+if(!selectedNode)return;
+const selNodes = nodes.filter(n=>selectedNodeIds.has(n.id));
+selectedNodeIds.clear();
+selNodes.forEach(n=>{
+const newNode={...n, id:++nodeIdCounter, x:n.x+30, y:n.y+30, text:n.text+' (копiя)', isRoot:false};
+nodes.push(newNode);
+selectedNodeIds.add(newNode.id);
+selectedNode=newNode;
+});
+renderNodes();
+updateNodeProperties();
+updateSidebarState();
+}
+function disconnectNode(){
+hideContextMenu();
+if(!selectedNode)return;
+selectedNodeIds.forEach(id=>{
+connections=connections.filter(c=>c.to!==id);
+});
+renderNodes();
+}
+function deleteSelected(){
+hideContextMenu();
+if(selectedNodeIds.size === 0) return;
+const idsToDelete = Array.from(selectedNodeIds);
+let cantDeleteRoot = false;
+idsToDelete.forEach(id=>{
+const node = nodes.find(n=>n.id===id);
+if(node && node.isRoot && nodes.length>1) {cantDeleteRoot = true; return;}
+connections=connections.filter(c=>c.from!==id&&c.to!==id);
+nodes=nodes.filter(n=>n.id!==id);
+});
+if(cantDeleteRoot && selectedNodeIds.size===1) return;
+selectedNodeIds.clear();
+selectedNode=null;
+renderNodes();
+updateNodeProperties();
+}
 function startResizing(e,node){e.stopPropagation();e.preventDefault();resizingNode=node;selectedNode=node;renderNodes();updateNodeProperties();updateSidebarState();}
 function startDragging(e,node){
 if(e.target.classList.contains('connection-point')||e.target.classList.contains('node-children-indicator')||e.target.classList.contains('resize-handle'))return;
 if(spacePressed||e.button===1||brushMode||isExportSelecting)return;
 e.stopPropagation();
-draggingNode=node;
+if(!selectedNodeIds.has(node.id) && !e.shiftKey){
+selectedNodeIds.clear();
+selectedNodeIds.add(node.id);
 selectedNode=node;
+} else if(!selectedNodeIds.has(node.id) && e.shiftKey){
+selectedNodeIds.add(node.id);
+selectedNode=node;
+} else {
+selectedNode=node;
+}
+draggingNode=node;
 const pos = getWorldPos({x:e.clientX, y:e.clientY});
-dragOffset={x:pos.x-node.x,y:pos.y-node.y};
+dragOffset={x:pos.x, y:pos.y};
 renderNodes();
 updateNodeProperties();
 updateSidebarState();
@@ -795,6 +908,20 @@ tempMouse = {x:pos.x, y:pos.y};
 currentStroke={type:drawTool,points:[{x:pos.x,y:pos.y}],color:document.getElementById('brushColor').value,size:parseInt(document.getElementById('brushSize').value)};
 return;
 }
+if(e.button===0 && !isNode && !spacePressed){
+isMultiSelecting = true;
+selectionStart = {x:e.clientX, y:e.clientY};
+const box = document.getElementById('selectionBox');
+box.style.left = selectionStart.x + 'px';
+box.style.top = selectionStart.y + 'px';
+box.style.width = '0px';
+box.style.height = '0px';
+box.style.display = 'block';
+selectedNodeIds.clear();
+selectedNode=null;
+renderNodes();
+return;
+}
 if(e.button===1||(e.button===0&&spacePressed)){
 isPanning=true;
 panStart={x:e.clientX,y:e.clientY};
@@ -822,6 +949,21 @@ box.style.width = width + 'px';
 box.style.height = height + 'px';
 return;
 }
+if(isMultiSelecting){
+const currentX = e.clientX;
+const currentY = e.clientY;
+const width = Math.abs(currentX - selectionStart.x);
+const height = Math.abs(currentY - selectionStart.y);
+const left = Math.min(currentX, selectionStart.x);
+const top = Math.min(currentY, selectionStart.y);
+const box = document.getElementById('selectionBox');
+const rect = wrapper.getBoundingClientRect();
+box.style.left = (left - rect.left) + 'px';
+box.style.top = (top - rect.top) + 'px';
+box.style.width = width + 'px';
+box.style.height = height + 'px';
+return;
+}
 if(resizingNode){
 const newW=Math.max(60,worldPos.x-resizingNode.x);
 const newH=Math.max(30,worldPos.y-resizingNode.y);
@@ -830,11 +972,16 @@ resizingNode.customHeight=newH;
 renderNodes();
 }
 if(draggingNode){
-draggingNode.x=worldPos.x-dragOffset.x;
-draggingNode.y=worldPos.y-dragOffset.y;
-if(document.getElementById('nodeXInput')){
-document.getElementById('nodeXInput').value=Math.round(draggingNode.x);
-document.getElementById('nodeYInput').value=Math.round(draggingNode.y);
+const dx = worldPos.x - dragOffset.x;
+const dy = worldPos.y - dragOffset.y;
+selectedNodeIds.forEach(id=>{
+const n = nodes.find(node=>node.id===id);
+if(n){n.x+=dx; n.y+=dy;}
+});
+dragOffset = {x:worldPos.x, y:worldPos.y};
+if(document.getElementById('nodeXInput') && selectedNode){
+document.getElementById('nodeXInput').value=Math.round(selectedNode.x);
+document.getElementById('nodeYInput').value=Math.round(selectedNode.y);
 }
 renderNodes();
 }
@@ -905,6 +1052,32 @@ const w = Math.abs(endX - exportStart.x);
 const h = Math.abs(endY - exportStart.y);
 if(w>5 && h>5) finishExportSelection(x,y,w,h);
 wrapper.style.cursor = 'default';
+return;
+}
+if(isMultiSelecting){
+isMultiSelecting = false;
+const box = document.getElementById('selectionBox');
+box.style.display='none';
+const rect = wrapper.getBoundingClientRect();
+const endX = e.clientX;
+const endY = e.clientY;
+const left = Math.min(selectionStart.x, endX) - rect.left;
+const top = Math.min(selectionStart.y, endY) - rect.top;
+const right = Math.max(selectionStart.x, endX) - rect.left;
+const bottom = Math.max(selectionStart.y, endY) - rect.top;
+const startWorld = getWorldPos({x: Math.min(selectionStart.x, endX), y: Math.min(selectionStart.y, endY)});
+const endWorld = getWorldPos({x: Math.max(selectionStart.x, endX), y: Math.max(selectionStart.y, endY)});
+nodes.forEach(n => {
+const nodeRight = n.x + (n.width || 140);
+const nodeBottom = n.y + (n.height || 40);
+if(n.x >= startWorld.x && nodeRight <= endWorld.x && n.y >= startWorld.y && nodeBottom <= endWorld.y){
+selectedNodeIds.add(n.id);
+selectedNode = n;
+}
+});
+renderNodes();
+updateNodeProperties();
+updateSidebarState();
 return;
 }
 if(resizingNode){resizingNode=null;}
@@ -1105,8 +1278,8 @@ ctx.stroke();
 }else if(d.type==='arrow'){
 const angle=Math.atan2(d.y2-d.y1,d.x2-d.x1);
 const headLen=d.size*4;
-const ex=d.x2 - headLen * Math.cos(angle) * 0.8;
-const ey=d.y2 - headLen * Math.sin(angle) * 0.8;
+const ex = d.x2 - headLen * Math.cos(angle) * 0.8;
+const ey = d.y2 - headLen * Math.sin(angle) * 0.8;
 ctx.beginPath();
 ctx.moveTo(d.x1,d.y1);
 ctx.lineTo(ex, ey);
