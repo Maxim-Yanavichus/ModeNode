@@ -148,9 +148,6 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 <div class="toolbar-group">
 <button class="toolbar-btn" onclick="openExportModal()">Скачати</button>
 </div>
-<div class="toolbar-group" style="border-right:none;">
-<button class="toolbar-btn" onclick="shareMap()">Подiлитися</button>
-</div>
 </div>
 <div class="toolbar-right">
 <button class="toolbar-btn" onclick="openSettings()">Налаштування</button>
@@ -266,7 +263,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 <div class="settings-row"><span>Темна тема</span><div class="switch" id="themeSwitch" onclick="toggleTheme()"></div></div>
 <div class="settings-row"><span>Сiтка</span><div class="switch active" id="gridSwitch" onclick="toggleGrid()"></div></div>
 <div class="form-group" style="margin-top:8px;"><label>Назва карти</label><input type="text" class="input-field" id="mapName" value="Нова карта" onchange="updateMapName()"></div>
-<div class="form-group" style="margin-top:10px;border-top:1px solid var(--border-color);padding-top:10px;"><label>Iмпорт карти</label><input type="file" id="importInput" accept=".json" style="display:none" onchange="importMap(event)"><button class="btn-small" onclick="document.getElementById('importInput').click()" style="width:100%;margin-top:4px;">Вiдкрити JSON файл</button></div>
+<div class="form-group" style="margin-top:10px;border-top:1px solid var(--border-color);padding-top:10px;"><label>Iмпорт/Експорт</label><input type="file" id="importInput" accept=".json" style="display:none" onchange="importMap(event)"><button class="btn-small" onclick="document.getElementById('importInput').click()" style="width:100%;margin-top:4px;">Вiдкрити JSON файл</button><button class="btn-small" onclick="shareMap()" style="width:100%;margin-top:4px;">Експортувати JSON (Подiлитися)</button></div>
 </div>
 </div>
 <div class="modal-overlay hidden" id="restoreModal">
@@ -309,7 +306,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
 <input type="file" id="audioInput" accept="audio/*" style="display:none" onchange="handleAudioUpload(event)">
 <script>
-let maps=[],currentMapIndex=0,nodes=[],connections=[],selectedNode=null,draggingNode=null,resizingNode=null,dragOffset={x:0,y:0},connectingFrom=null,connectingPoint=null,zoom=1,pan={x:0,y:0},isPanning=false,panStart={x:0,y:0},panOffset={x:0,y:0},nodeIdCounter=0,mapIdCounter=0,isDarkTheme=false,showGrid=true,spacePressed=false,brushMode=false,drawTool='line',isDrawing=false,drawStart={x:0,y:0},mainCtx=null,drawings=[],currentStroke=null;
+let maps=[],currentMapIndex=0,nodes=[],connections=[],selectedNode=null,draggingNode=null,resizingNode=null,dragOffset={x:0,y:0},connectingFrom=null,connectingPoint=null,zoom=1,pan={x:0,y:0},isPanning=false,panStart={x:0,y:0},panOffset={x:0,y:0},nodeIdCounter=0,mapIdCounter=0,isDarkTheme=false,showGrid=true,spacePressed=false,brushMode=false,drawTool='line',isDrawing=false,drawStart={x:0,y:0},mainCtx=null,drawings=[],currentStroke=null,sessionStarted=false;
 let isExportSelecting=false, exportStart={x:0,y:0};
 document.addEventListener('DOMContentLoaded',()=>{
 const canvas = document.getElementById('mainCanvas');
@@ -336,6 +333,7 @@ if(localStorage.getItem('modeNodeData')){
 document.getElementById('restoreModal').classList.remove('hidden');
 }else{
 createNewMap();
+sessionStarted=true;
 }
 }
 function restoreSession(){
@@ -354,13 +352,16 @@ renderTabs();
 if(isDarkTheme){document.body.setAttribute('data-theme','dark');document.getElementById('themeSwitch').classList.add('active');}
 }
 }catch(e){createNewMap();}
+sessionStarted=true;
 document.getElementById('restoreModal').classList.add('hidden');
 }
 function closeRestore(){
 createNewMap();
+sessionStarted=true;
 document.getElementById('restoreModal').classList.add('hidden');
 }
 function saveToLocalStorage(){
+if(!sessionStarted)return;
 const data={maps,currentMapIndex,mapIdCounter,isDarkTheme};
 localStorage.setItem('modeNodeData', JSON.stringify(data));
 }
@@ -375,7 +376,7 @@ const nodesLayer = document.getElementById('nodesLayer');
 nodesLayer.style.transform = `translate(${pan.x}px,${pan.y}px) scale(${zoom})`;
 }
 function createNewMap(){
-saveCurrentMap();
+if(sessionStarted) saveCurrentMap();
 const mapId=++mapIdCounter;
 const mapData={id:mapId,name:'Карта '+mapId,nodes:[],connections:[],nodeIdCounter:0,drawings:[]};
 const rootNode={id:1,x:0,y:0,text:'Головна iдея',isRoot:true,borderColor:'#3b82f6',fillColor:'#ffffff',textColor:'#1e293b',borderWidth:2,shape:'rounded',font:'Segoe UI',fontSize:0,bold:true,italic:false,collapsed:false,image:null,audio:null,customWidth:null,customHeight:null,imageOnly:false};
@@ -1145,7 +1146,7 @@ ctx.stroke();
 if(node.image){
 const img=new Image();
 img.src=node.image;
-try {
+try{
 if(node.imageOnly){
 ctx.save();
 ctx.clip();
@@ -1156,7 +1157,7 @@ const iw=Math.min(img.width,100);
 const ih=(img.height/img.width)*iw;
 ctx.drawImage(img,x+w/2-iw/2,y+5,iw,ih);
 }
-} catch(e){}
+}catch(e){}
 }
 if(!node.imageOnly){
 ctx.fillStyle=node.textColor;
