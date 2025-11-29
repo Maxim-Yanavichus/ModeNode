@@ -316,6 +316,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 </div>
 <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
 <input type="file" id="audioInput" accept="audio/*" style="display:none" onchange="handleAudioUpload(event)">
+<link rel="icon" type="image/x-icon" href="/modenode.ico">
 <script>
 let maps=[],currentMapIndex=0,nodes=[],connections=[],selectedNode=null,draggingNode=null,resizingNode=null,dragOffset={x:0,y:0},connectingFrom=null,connectingPoint=null,zoom=1,pan={x:0,y:0},isPanning=false,panStart={x:0,y:0},panOffset={x:0,y:0},nodeIdCounter=0,mapIdCounter=0,isDarkTheme=false,showGrid=true,spacePressed=false,brushMode=false,drawTool='line',isDrawing=false,drawStart={x:0,y:0},mainCtx=null,drawings=[],currentStroke=null,sessionStarted=false,selectedNodeIds=new Set(),snapToGrid=false,historyStack=[],redoStack=[];
 let isExportSelecting=false, exportStart={x:0,y:0}, isMultiSelecting=false, selectionStart={x:0,y:0};
