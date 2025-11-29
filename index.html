@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ModeNode - Редактор ментальних карт</title>
+<title>ModeNode Від Максима</title>
 <style>
 :root{--bg-primary:#f8fafc;--bg-secondary:#ffffff;--bg-toolbar:#e2e8f0;--text-primary:#1e293b;--text-secondary:#475569;--border-color:#cbd5e1;--node-bg:#ffffff;--node-border:#3b82f6;--canvas-bg:#f1f5f9;--canvas-grid:#e2e8f0;--connection-line:#64748b;}
 [data-theme="dark"]{--bg-primary:#0f172a;--bg-secondary:#1e293b;--bg-toolbar:#334155;--text-primary:#f1f5f9;--text-secondary:#94a3b8;--border-color:#475569;--node-bg:#1e293b;--node-border:#3b82f6;--canvas-bg:#0f172a;--canvas-grid:#1e293b;--connection-line:#94a3b8;}
@@ -26,7 +26,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:va
 .canvas-wrapper{flex:1;position:relative;overflow:hidden;background-color:var(--canvas-bg);cursor:default;}
 .main-canvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;}
 .nodes-layer{position:absolute;top:0;left:0;width:0;height:0;z-index:2;transform-origin:0 0;overflow:visible;}
-.node{position:absolute;background-color:var(--node-bg);cursor:move;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:box-shadow 0.2s;display:flex;align-items:center;justify-content:center;flex-direction:column;border-style:solid;min-width:140px;padding:8px 12px;}
+.node{position:absolute;background-color:var(--node-bg);cursor:move;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:box-shadow 0.2s;display:flex;align-items:center;justify-content:center;flex-direction:column;border-style:solid;min-width:50px;padding:8px 12px;}
 .node:hover{box-shadow:0 4px 16px rgba(0,0,0,0.15);}
 .node.selected{box-shadow:0 0 0 3px rgba(59,130,246,0.6); z-index: 100;}
 .node.shape-rectangle{border-radius:4px;}
@@ -490,7 +490,7 @@ if(node.shape==='bubble')el.style.setProperty('--bubble-color',node.borderColor)
 if(node.shape==='underline'){el.style.borderBottomColor=node.borderColor;el.style.borderBottomWidth=(node.borderWidth||2)+'px';}
 let fontSize = node.fontSize || 14;
 if(node.fontSize === 0 || node.fontSize === 'auto') {
-fontSize = Math.max(12, Math.min(36, (node.customWidth || 140) / 8));
+fontSize = Math.max(12, Math.min(36, (node.customWidth || 50) / 8));
 }
 const textStyle=`font-family:'${node.font}',sans-serif;font-size:${fontSize}px;font-weight:${node.bold?'bold':'normal'};font-style:${node.italic?'italic':'normal'};color:${node.textColor};`;
 let content='';
@@ -520,7 +520,7 @@ renderTreeView();
 updateNodeCount();
 }
 function getConnectionPoint(node,point){
-const w=node.width||140;
+const w=node.width||50;
 const h=node.height||40;
 switch(point){
 case 'top':return{x:node.x+w/2,y:node.y+(node.shape==='underline'?h-5:0)};
@@ -832,7 +832,7 @@ let parentNode=selectedNode;
 if(!parentNode){parentNode=nodes.find(n=>n.isRoot);if(!parentNode)return;}
 if(parentNode.collapsed)parentNode.collapsed=false;
 const childCount=connections.filter(c=>c.from===parentNode.id).length;
-const newNode=createNodeObject(parentNode.x+(parentNode.width||140)+60,parentNode.y+childCount*50);
+const newNode=createNodeObject(parentNode.x+(parentNode.width||50)+60,parentNode.y+childCount*50);
 nodes.push(newNode);
 connections.push({id:Date.now(),from:parentNode.id,to:newNode.id,fromPoint:'right',toPoint:'left'});
 selectedNodeIds.clear();
@@ -1041,7 +1041,7 @@ box.style.height = height + 'px';
 return;
 }
 if(resizingNode){
-const newW=Math.max(60,worldPos.x-resizingNode.x);
+const newW=Math.max(50,worldPos.x-resizingNode.x);
 const newH=Math.max(30,worldPos.y-resizingNode.y);
 resizingNode.customWidth=newW;
 resizingNode.customHeight=newH;
@@ -1147,9 +1147,9 @@ const endY = e.clientY;
 const startWorld = getWorldPos({x: Math.min(selectionStart.x, endX), y: Math.min(selectionStart.y, endY)});
 const endWorld = getWorldPos({x: Math.max(selectionStart.x, endX), y: Math.max(selectionStart.y, endY)});
 nodes.forEach(n => {
-const nodeRight = n.x + (n.width || 60);
+const nodeRight = n.x + (n.width || 50);
 const nodeBottom = n.y + (n.height || 40);
-if(n.x + (n.width||60) >= startWorld.x && n.x <= endWorld.x && n.y + (n.height||40) >= startWorld.y && n.y <= endWorld.y){
+if(n.x + (n.width||50) >= startWorld.x && n.x <= endWorld.x && n.y + (n.height||40) >= startWorld.y && n.y <= endWorld.y){
 selectedNodeIds.add(n.id);
 selectedNode = n;
 }
@@ -1391,7 +1391,7 @@ ctx.stroke();
 for(const node of nodes){
 const x=node.x;
 const y=node.y;
-const w=node.width||60;
+const w=node.width||50;
 const h=node.height||40;
 ctx.fillStyle=node.fillColor;
 ctx.strokeStyle=node.borderColor;
@@ -1461,7 +1461,7 @@ async function exportToPNG(){
 const canvas=document.createElement('canvas');
 const ctx=canvas.getContext('2d');
 let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-nodes.forEach(n=>{minX=Math.min(minX,n.x-20);minY=Math.min(minY,n.y-20);maxX=Math.max(maxX,n.x+(n.width||60)+20);maxY=Math.max(maxY,n.y+(n.height||40)+20);});
+nodes.forEach(n=>{minX=Math.min(minX,n.x-20);minY=Math.min(minY,n.y-20);maxX=Math.max(maxX,n.x+(n.width||50)+20);maxY=Math.max(maxY,n.y+(n.height||40)+20);});
 drawings.forEach(d=>{
 if((d.type==='brush'||d.type==='pencil')&&d.points){d.points.forEach(p=>{minX=Math.min(minX,p.x-20);minY=Math.min(minY,p.y-20);maxX=Math.max(maxX,p.x+20);maxY=Math.max(maxY,p.y+20);});}
 else if(d.type==='line'||d.type==='arrow'){minX=Math.min(minX,d.x1-20,d.x2-20);minY=Math.min(minY,d.y1-20,d.y2-20);maxX=Math.max(maxX,d.x1+20,d.x2+20);maxY=Math.max(maxY,d.y1+20,d.y2+20);}
